@@ -1,5 +1,7 @@
 import csv
 import datetime
+import os
+
 import pygame
 import pygame.freetype
 import time
@@ -154,6 +156,8 @@ def plot_audio(audio1):
 
 
 if __name__ == "__main__":
+    os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
