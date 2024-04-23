@@ -10,10 +10,12 @@ import matplotlib.pyplot as plt
 import threading
 import wave
 
-CHUNK = 10000
+CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
+CSV_PATH = 'breaths/'
+WAV_PATH = 'breaths/'
 
 
 class SharedAudioResource:
@@ -79,9 +81,8 @@ def pygame_thread(audio):
                         start_time = time.time()
                         now = datetime.datetime.now()
                         filename = now.strftime('%Y-%m-%d_%H-%M-%S')
-                        csvname = filename
-                        csvname += '.csv'
-                        filename += '.wav'
+                        csvname = CSV_PATH + filename + '.csv'
+                        filename = WAV_PATH + filename + '.wav'
                         frames = []
                         wf = wave.open(filename, 'wb')
                         wf.setnchannels(CHANNELS)
