@@ -10,18 +10,27 @@ import matplotlib.pyplot as plt
 import threading
 import wave
 
-CHUNK = 1024
+# To remove delay from audio plot, change AUDIO_CHUNK and PLOT_CHUNK to e.g. 5000
+# then pygame and recorded audio will be delayed
+
+# key SPACE - start/stop recording
+# key W - inhale
+# key P - exhale
+
+AUDIO_CHUNK = 1024
+PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
-CSV_PATH = 'breaths/'
-WAV_PATH = 'breaths/'
+WAV_EXHALE_PATH = 'data/exhale/'
+WAV_INHALE_PATH = 'data/inhale/'
 
 
 class SharedAudioResource:
     def __init__(self):
         self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+        self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
+                                  frames_per_buffer=AUDIO_CHUNK)
 
     def read(self, size):
         return self.stream.read(size)
@@ -62,13 +71,11 @@ def pygame_thread(audio):
     button = Button(BUTTON_POS)
 
     start_time = None
-    w_pressed = False
+    w_pressed = True
     p_pressed = False
     running = True
     frames = []
-    data_csv = []
     wf = None
-    csvname = ""
     while running:
         screen.fill((0, 0, 0))
         for event in pygame.event.get():
@@ -81,8 +88,8 @@ def pygame_thread(audio):
                         start_time = time.time()
                         now = datetime.datetime.now()
                         filename = now.strftime('%Y-%m-%d_%H-%M-%S')
-                        csvname = CSV_PATH + filename + '.csv'
-                        filename = WAV_PATH + filename + '.wav'
+                        wav_path = WAV_EXHALE_PATH if p_pressed else WAV_INHALE_PATH
+                        filename = wav_path + filename + '.wav'
                         frames = []
                         wf = wave.open(filename, 'wb')
                         wf.setnchannels(CHANNELS)
@@ -93,42 +100,29 @@ def pygame_thread(audio):
                         if wf is not None:
                             wf.writeframes(b''.join(frames))
                             wf.close()
-                        with open(csvname, 'w', newline='') as f:
-                            writer = csv.writer(f)
-                            writer.writerow(['Time', 'Breath'])
-                            writer.writerows(data_csv)
                         recording = False
                 elif event.key == pygame.K_w:
+                    p_pressed = False
                     w_pressed = True
                 elif event.key == pygame.K_p:
-                    p_pressed = True
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_w:
                     w_pressed = False
-                elif event.key == pygame.K_p:
-                    p_pressed = False
+                    p_pressed = True
 
         button.draw(screen)
 
         if button.recording:
             elapsed_time = time.time() - start_time
             draw_text(f"Recording: {elapsed_time:.2f}s", TIMER_POS, font, screen)
-            data = audio.read(CHUNK)
+            data = audio.read(AUDIO_CHUNK)
             if recording:
                 frames.append(data)
-                value = 0
-                if w_pressed:
-                    value = 1
-                elif p_pressed:
-                    value = -1
-                data_csv.append([elapsed_time, value])
         else:
             draw_text("Press SPACE to start recording", TIMER_POS, font, screen)
 
         if w_pressed:
-            draw_text("Oddech", TEXT_POS, font, screen)
+            draw_text("Inhale", TEXT_POS, font, screen)
         elif p_pressed:
-            draw_text("Wydech", TEXT_POS, font, screen)
+            draw_text("Exhale", TEXT_POS, font, screen)
 
         pygame.display.flip()
         clock.tick(60)
@@ -138,7 +132,7 @@ def pygame_thread(audio):
 
 def plot_audio(audio1):
     def animate(i):
-        frames = audio1.read(CHUNK)
+        frames = audio1.read(PLOT_CHUNK)
         data = np.frombuffer(frames, dtype=np.int16)
         left_channel = data[::2]  # even index: left channel
         right_channel = data[1::2]  # odd index: right channel
@@ -147,14 +141,14 @@ def plot_audio(audio1):
         return line1, line2,
 
     fig, axs = plt.subplots(2)
-    x = np.arange(0, 2 * CHUNK, 2)
-    line1, = axs[0].plot(x, np.random.rand(CHUNK))
-    line2, = axs[1].plot(x, np.random.rand(CHUNK))
+    x = np.arange(0, 2 * PLOT_CHUNK, 2)
+    line1, = axs[0].plot(x, np.random.rand(PLOT_CHUNK))
+    line2, = axs[1].plot(x, np.random.rand(PLOT_CHUNK))
 
     axs[0].set_ylim(-1500, 1500)
-    axs[0].set_xlim(0, CHUNK / 2)
+    axs[0].set_xlim(0, PLOT_CHUNK / 2)
     axs[1].set_ylim(-1500, 1500)
-    axs[1].set_xlim(0, CHUNK / 2)
+    axs[1].set_xlim(0, PLOT_CHUNK / 2)
     ani = animation.FuncAnimation(fig, animate, frames=100, blit=True)
     plt.show()
 
