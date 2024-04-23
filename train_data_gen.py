@@ -1,7 +1,5 @@
-import csv
 import datetime
 import os
-
 import pygame
 import pygame.freetype
 import time
@@ -66,6 +64,7 @@ def pygame_thread(audio):
     TIMER_POS = (WIDTH // 2, HEIGHT // 2)
     BUTTON_POS = (WIDTH // 2, HEIGHT // 2 + 50)
     TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
+    PRESS_POS = (WIDTH // 2, HEIGHT // 2 - 50)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     font = pygame.freetype.SysFont(None, FONT_SIZE)
@@ -119,6 +118,7 @@ def pygame_thread(audio):
             if recording:
                 frames.append(data)
         else:
+            draw_text("Press W to record inhale | Press P to record exhale", PRESS_POS, font, screen)
             draw_text("Press SPACE to start recording", TIMER_POS, font, screen)
 
         if w_pressed:
@@ -161,6 +161,6 @@ if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    plot_audio(audio)
+    #plot_audio(audio)
     pygame_thread_instance.join()
     audio.close()
