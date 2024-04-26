@@ -22,8 +22,26 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
-WAV_EXHALE_PATH = 'data/exhale/'
-WAV_INHALE_PATH = 'data/inhale/'
+
+TEST = False
+WAV_EXHALE_PATH = ""
+WAV_INHALE_PATH = ""
+
+
+def changePaths(test: bool):
+    global WAV_EXHALE_PATH
+    global WAV_INHALE_PATH
+
+    if test:
+        WAV_EXHALE_PATH = 'data/test/exhale/'
+        WAV_INHALE_PATH = 'data/test/inhale/'
+        os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
+    else:
+        WAV_EXHALE_PATH = 'data/train/exhale/'
+        WAV_INHALE_PATH = 'data/train/inhale/'
+        os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
 
 
 class SharedAudioResource:
@@ -57,14 +75,16 @@ def draw_text(text, pos, font, screen):
 
 
 def pygame_thread(audio):
+    global TEST
     pygame.init()
-
+    changePaths(TEST)
     WIDTH, HEIGHT = 1366, 768
     FONT_SIZE = 24
     TIMER_POS = (WIDTH // 2, HEIGHT // 2)
     BUTTON_POS = (WIDTH // 2, HEIGHT // 2 + 50)
     TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
     PRESS_POS = (WIDTH // 2, HEIGHT // 2 - 50)
+    TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     font = pygame.freetype.SysFont(None, FONT_SIZE)
@@ -108,6 +128,9 @@ def pygame_thread(audio):
                 elif event.key == pygame.K_e:
                     w_pressed = False
                     p_pressed = True
+                elif event.key == pygame.K_t:
+                    TEST = not (TEST)
+                    changePaths(TEST)
 
         button.draw(screen)
 
@@ -118,13 +141,18 @@ def pygame_thread(audio):
             if recording:
                 frames.append(data)
         else:
-            draw_text("Press W to record inhale | Press E to record exhale", PRESS_POS, font, screen)
+            draw_text("Press:  W to inhale | E to exhale | T - to change TRAIN/TEST", PRESS_POS, font, screen)
             draw_text("Press Q to start recording", TIMER_POS, font, screen)
 
         if w_pressed:
             draw_text("Inhale", TEXT_POS, font, screen)
         elif p_pressed:
             draw_text("Exhale", TEXT_POS, font, screen)
+
+        if TEST:
+            draw_text('Recording TEST data', TEST_POS, font, screen)
+        else:
+            draw_text('Recording TRAIN data', TEST_POS, font, screen)
 
         pygame.display.flip()
         clock.tick(60)
@@ -156,11 +184,9 @@ def plot_audio(audio1):
 
 
 if __name__ == "__main__":
-    os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
-    os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    #plot_audio(audio)
+    # plot_audio(audio)
     pygame_thread_instance.join()
     audio.close()
