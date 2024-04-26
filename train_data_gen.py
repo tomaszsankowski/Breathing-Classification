@@ -83,7 +83,7 @@ def pygame_thread(audio):
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_q:
                     button.recording = not button.recording
                     if button.recording:
                         start_time = time.time()
@@ -105,7 +105,7 @@ def pygame_thread(audio):
                 elif event.key == pygame.K_w:
                     p_pressed = False
                     w_pressed = True
-                elif event.key == pygame.K_p:
+                elif event.key == pygame.K_e:
                     w_pressed = False
                     p_pressed = True
 
@@ -118,8 +118,8 @@ def pygame_thread(audio):
             if recording:
                 frames.append(data)
         else:
-            draw_text("Press W to record inhale | Press P to record exhale", PRESS_POS, font, screen)
-            draw_text("Press SPACE to start recording", TIMER_POS, font, screen)
+            draw_text("Press W to record inhale | Press E to record exhale", PRESS_POS, font, screen)
+            draw_text("Press Q to start recording", TIMER_POS, font, screen)
 
         if w_pressed:
             draw_text("Inhale", TEXT_POS, font, screen)

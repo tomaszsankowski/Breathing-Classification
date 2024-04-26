@@ -3,22 +3,23 @@ import os
 import numpy as np
 import tensorflow.compat.v1 as tf
 from model import vggish_input, vggish_params, vggish_slim
+import pandas as pd
 import matplotlib.pyplot as plt
 
 # Path to the sound file with the breathing recording
-breaths_dir_path = 'breaths'
+inhale_dir_path = 'data/exhale'
+exhale_dir_path = 'data/exhale'
 start_time = time.time()
 # Path to the VGGish checkpoint
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 
-
 # List to store the embeddings from all files
 all_embeddings = []
-for filename in os.listdir(breaths_dir_path):
+for filename in os.listdir(inhale_dir_path):
     if filename.endswith('.wav'):
         one_time = time.time()
         # Full path to the sound file
-        breathing_sound_file_path = os.path.join(breaths_dir_path, filename)
+        breathing_sound_file_path = os.path.join(inhale_dir_path, filename)
 
         # Load the breathing sound as sound waves
         breathing_waveform = vggish_input.wavfile_to_examples(breathing_sound_file_path)
@@ -39,8 +40,7 @@ for filename in os.listdir(breaths_dir_path):
             print("Size", len(embedding_batch))
             print("Time", time.time() - one_time)
 
-
+df = pd.DataFrame(np.concatenate(all_embeddings))
+df.to_csv('exhale_test.csv', index=False)
 print("End time:", time.time() - start_time)
-
-
 # Now the embeddings (embedding_batch) can be used for classification
