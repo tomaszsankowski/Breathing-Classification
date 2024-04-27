@@ -8,3 +8,5 @@ matplotlib
 pygame
 pyaudio
 pandas
+scikit-learn
+matplotlib
