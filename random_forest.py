@@ -3,12 +3,14 @@ from sklearn.model_selection import cross_val_score
 import pandas as pd
 import time
 import result_analysis
+import joblib
 
 ######################################################
 CSV_EXHALE_TRAIN_PATH = 'data/train/exhale/exhale.csv'
 CSV_INHALE_TRAIN_PATH = 'data/train/inhale/inhale.csv'
 CSV_INHALE_TEST_PATH = 'data/test/exhale/exhale.csv'
 CSV_EXHALE_TEST_PATH = 'data/test/inhale/inhale.csv'
+MODEL_PATH = 'model/trained_model_rf.pkl'
 ######################################################
 
 # Wczytanie danych treningowych
@@ -27,6 +29,7 @@ X_test = pd.concat([X_test_ex, X_test_in], ignore_index=True)
 # Tworzenie i trenowanie klasyfikatora
 rf_classifier = RandomForestClassifier(n_estimators=100)
 rf_classifier.fit(X_train, y_train)
+joblib.dump(rf_classifier, MODEL_PATH)
 
 #Kroswalidacja
 scores = cross_val_score(rf_classifier, X_train, y_train, cv=3, scoring="accuracy")

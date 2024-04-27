@@ -10,18 +10,22 @@ import matplotlib.pyplot as plt
 import threading
 import wave
 
-# To remove delay from audio plot, change AUDIO_CHUNK and PLOT_CHUNK to e.g. 5000
-# then pygame and recorded audio will be delayed
-
-# key SPACE - start/stop recording
-# key W - inhale
-# key P - exhale
-
+# ###########################################################################################
+# Plot is active at recording
+# ###########################################################################################
+# If there's an issue with the microphone, find the index of the microphone you want to use in the console,
+# along with its sampleRate. Then, change the variable RATE below and add the parameter
+# input_device_index=INDEX_OF_MICROPHONE
+# to
+# self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
+# ###########################################################################################
 AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 44100
+RATE = 48000
+##################################
+# self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 
 TEST = False
 WAV_EXHALE_PATH = ""
@@ -45,13 +49,19 @@ def changePaths(test: bool):
 
 
 class SharedAudioResource:
+    buffer = None
+
     def __init__(self):
         self.p = pyaudio.PyAudio()
+        for i in range(self.p.get_device_count()):
+            print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=6)
+        self.read(AUDIO_CHUNK)
 
     def read(self, size):
-        return self.stream.read(size)
+        self.buffer = self.stream.read(size, exception_on_overflow=False)
+        return self.buffer
 
     def close(self):
         self.stream.stop_stream()
@@ -162,7 +172,7 @@ def pygame_thread(audio):
 
 def plot_audio(audio1):
     def animate(i):
-        frames = audio1.read(PLOT_CHUNK)
+        frames = audio1.buffer
         data = np.frombuffer(frames, dtype=np.int16)
         left_channel = data[::2]  # even index: left channel
         right_channel = data[1::2]  # odd index: right channel
@@ -187,6 +197,6 @@ if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    # plot_audio(audio)
+    plot_audio(audio)
     pygame_thread_instance.join()
     audio.close()

@@ -10,3 +10,4 @@ pyaudio
 pandas
 scikit-learn
 matplotlib
+joblib
