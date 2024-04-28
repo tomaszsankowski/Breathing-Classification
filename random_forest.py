@@ -13,32 +13,33 @@ CSV_EXHALE_TEST_PATH = 'data/test/inhale/inhale.csv'
 MODEL_PATH = 'model/trained_model_rf.pkl'
 ######################################################
 
-# Wczytanie danych treningowych
+# load training data
 X_train_inhale = pd.read_csv(CSV_INHALE_TRAIN_PATH)
 X_train_exhale = pd.read_csv(CSV_EXHALE_TRAIN_PATH)
 
-# Połączenie danych treningowych w jeden DataFrame
+# combining training data into one DataFrame
 X_train = pd.concat([X_train_inhale, X_train_exhale], ignore_index=True)
 
-# Tworzenie etykiet dla danych treningowych
+# labeling training data
 y_train = [0] * len(X_train_inhale) + [1] * len(X_train_exhale)
 
 X_test_ex = pd.read_csv(CSV_EXHALE_TEST_PATH)
 X_test_in = pd.read_csv(CSV_INHALE_TEST_PATH)
 X_test = pd.concat([X_test_ex, X_test_in], ignore_index=True)
-# Tworzenie i trenowanie klasyfikatora
+# creating and training classifier
 rf_classifier = RandomForestClassifier(n_estimators=100)
 rf_classifier.fit(X_train, y_train)
 joblib.dump(rf_classifier, MODEL_PATH)
 
-#Kroswalidacja
+# cross-validation
 scores = cross_val_score(rf_classifier, X_train, y_train, cv=3, scoring="accuracy")
 print("Cross-validation accuracy:", scores)
 
-#Analiza błedow
+# error analysis
 result_analysis.analyse_error(rf_classifier, X_train, y_train)
 
-# Predykcja
+# TODO : check accuracy on test data
+# prediction
 start = time.time()
 predictions = rf_classifier.predict(X_test)
 print("Time", time.time() - start)
