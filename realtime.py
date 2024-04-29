@@ -96,10 +96,17 @@ def pygame_thread(audio):
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
             df = pd.DataFrame(embedding_batch)
+
             prediction = rf_classifier.predict(df)
             if len(prediction_arr) == 5:
                 prediction_arr = []
-            prediction_arr.append(prediction[0])
+            if prediction[0] == 0:
+                prediction_arr.append('Inhale')
+            elif prediction[0] == 1:
+                prediction_arr.append('Exhale')
+            else:
+                prediction_arr.append('Silence')
+
             draw_text(f"Prediction {prediction_arr}", TEXT_POS, font, screen)
             print(time.time() - start_time)
             for event in pygame.event.get():

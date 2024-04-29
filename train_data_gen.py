@@ -24,28 +24,35 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
+INPUT_DEVICE_INDEX = 0
 ##################################
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 
-TEST = False
+TEST = True
 WAV_EXHALE_PATH = ""
 WAV_INHALE_PATH = ""
+WAV_SILENCE_PATH = ""
 
 
 def changePaths(test: bool):
     global WAV_EXHALE_PATH
     global WAV_INHALE_PATH
+    global WAV_SILENCE_PATH
 
     if test:
         WAV_EXHALE_PATH = 'data/test/exhale/'
         WAV_INHALE_PATH = 'data/test/inhale/'
+        WAV_SILENCE_PATH = 'data/test/silence/'
         os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
         os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
     else:
         WAV_EXHALE_PATH = 'data/train/exhale/'
         WAV_INHALE_PATH = 'data/train/inhale/'
+        WAV_SILENCE_PATH = 'data/train/silence/'
         os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
         os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
 
 
 class SharedAudioResource:
@@ -56,7 +63,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=6)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=INPUT_DEVICE_INDEX)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -67,16 +74,6 @@ class SharedAudioResource:
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
-
-
-class Button:
-    def __init__(self, pos):
-        self.pos = pos
-        self.recording = False
-
-    def draw(self, screen):
-        color = (255, 0, 0) if self.recording else (0, 255, 0)
-        pygame.draw.rect(screen, color, (*self.pos, 100, 50))
 
 
 def draw_text(text, pos, font, screen):
@@ -91,7 +88,6 @@ def pygame_thread(audio):
     WIDTH, HEIGHT = 1366, 768
     FONT_SIZE = 24
     TIMER_POS = (WIDTH // 2, HEIGHT // 2)
-    BUTTON_POS = (WIDTH // 2, HEIGHT // 2 + 50)
     TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
     PRESS_POS = (WIDTH // 2, HEIGHT // 2 - 50)
     TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
@@ -99,11 +95,39 @@ def pygame_thread(audio):
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     font = pygame.freetype.SysFont(None, FONT_SIZE)
     clock = pygame.time.Clock()
-    button = Button(BUTTON_POS)
+    recording = False
+
+    def start_recording():
+        nonlocal start_time, recording, frames, wf, w_pressed, r_pressed, e_pressed
+        start_time = time.time()
+        now = datetime.datetime.now()
+        filename = now.strftime('%Y-%m-%d_%H-%M-%S')
+
+        if w_pressed:
+            wav_path = WAV_INHALE_PATH
+        elif e_pressed:
+            wav_path = WAV_EXHALE_PATH
+        else:
+            wav_path = WAV_SILENCE_PATH
+
+        filename = wav_path + filename + '.wav'
+        frames = []
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(audio.p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        recording = True
+
+    def save_audio():
+        nonlocal wf, frames
+        if wf is not None:
+            wf.writeframes(b''.join(frames))
+            wf.close()
 
     start_time = None
-    w_pressed = True
-    p_pressed = False
+    w_pressed = False
+    e_pressed = False
+    r_pressed = False
     running = True
     frames = []
     wf = None
@@ -113,51 +137,55 @@ def pygame_thread(audio):
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:
-                    button.recording = not button.recording
-                    if button.recording:
-                        start_time = time.time()
-                        now = datetime.datetime.now()
-                        filename = now.strftime('%Y-%m-%d_%H-%M-%S')
-                        wav_path = WAV_EXHALE_PATH if p_pressed else WAV_INHALE_PATH
-                        filename = wav_path + filename + '.wav'
-                        frames = []
-                        wf = wave.open(filename, 'wb')
-                        wf.setnchannels(CHANNELS)
-                        wf.setsampwidth(audio.p.get_sample_size(FORMAT))
-                        wf.setframerate(RATE)
-                        recording = True
-                    else:
-                        if wf is not None:
-                            wf.writeframes(b''.join(frames))
-                            wf.close()
+                if event.key == pygame.K_s:
+                    if recording:
+                        save_audio()
                         recording = False
+                        w_pressed = False
+                        r_pressed = False
+                        e_pressed = False
                 elif event.key == pygame.K_w:
-                    p_pressed = False
-                    w_pressed = True
+                    if not w_pressed:
+                        save_audio()
+                        w_pressed = True
+                        r_pressed = False
+                        e_pressed = False
+                        start_recording()
                 elif event.key == pygame.K_e:
-                    w_pressed = False
-                    p_pressed = True
+                    if not e_pressed:
+                        save_audio()
+                        w_pressed = False
+                        p_pressed = False
+                        e_pressed = True
+                        start_recording()
+                elif event.key == pygame.K_r:
+                    if not r_pressed:
+                        save_audio()
+                        w_pressed = False
+                        r_pressed = True
+                        e_pressed = False
+                        start_recording()
                 elif event.key == pygame.K_t:
-                    TEST = not (TEST)
+                    TEST = not TEST
                     changePaths(TEST)
 
-        button.draw(screen)
 
-        if button.recording:
+        if recording:
             elapsed_time = time.time() - start_time
+            draw_text("Press s to stop recording", PRESS_POS, font, screen)
             draw_text(f"Recording: {elapsed_time:.2f}s", TIMER_POS, font, screen)
             data = audio.read(AUDIO_CHUNK)
-            if recording:
-                frames.append(data)
+            frames.append(data)
         else:
-            draw_text("Press:  W to inhale | E to exhale | T - to change TRAIN/TEST", PRESS_POS, font, screen)
-            draw_text("Press Q to start recording", TIMER_POS, font, screen)
+            draw_text("W:   record inhale    |   E:   record exhale", PRESS_POS, font, screen)
+            draw_text("R:   record silence   |   T:   switch TRAIN/TEST", TIMER_POS, font, screen)
 
         if w_pressed:
-            draw_text("Inhale", TEXT_POS, font, screen)
-        elif p_pressed:
-            draw_text("Exhale", TEXT_POS, font, screen)
+            draw_text("Inhale chosen", TEXT_POS, font, screen)
+        elif e_pressed:
+            draw_text("Exhale chosen", TEXT_POS, font, screen)
+        else:
+            draw_text("Silence chosen", TEXT_POS, font, screen)
 
         if TEST:
             draw_text('Recording TEST data', TEST_POS, font, screen)

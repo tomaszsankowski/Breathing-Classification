@@ -14,14 +14,16 @@ if TEST:
     CSV_PATH = 'data/test/csv/'
     INHALE_DIR_PATH = 'data/test/inhale'
     EXHALE_DIR_PATH = 'data/test/exhale'
+    SILENCE_DIR_PATH = 'data/test/silence'
 else:
     CSV_PATH = 'data/train/csv/'
     INHALE_DIR_PATH = 'data/train/inhale'
     EXHALE_DIR_PATH = 'data/train/exhale'
+    SILENCE_DIR_PATH = 'data/train/silence'
 
 start_time = time.time()
 os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
-paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH]
+paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH, SILENCE_DIR_PATH]
 for path in paths:
     all_embeddings = []
     print("Converting:", path)
@@ -55,9 +57,13 @@ for path in paths:
         print('Saving csv ' + EXHALE_DIR_PATH)
         file_path = CSV_PATH + 'exhale.csv'
         df.to_csv(file_path, index=False)
-    else:
+    elif path == INHALE_DIR_PATH:
         print('Saving csv' + INHALE_DIR_PATH)
         file_path = CSV_PATH + 'inhale.csv'
+        df.to_csv(file_path, index=False)
+    else:
+        print('Saving csv' + SILENCE_DIR_PATH)
+        file_path = CSV_PATH + 'silence.csv'
         df.to_csv(file_path, index=False)
 
 print("End time:", time.time() - start_time)
