@@ -146,21 +146,24 @@ def pygame_thread(audio):
                         e_pressed = False
                 elif event.key == pygame.K_w:
                     if not w_pressed:
-                        save_audio()
+                        if recording:
+                            save_audio()
                         w_pressed = True
                         r_pressed = False
                         e_pressed = False
                         start_recording()
                 elif event.key == pygame.K_e:
                     if not e_pressed:
-                        save_audio()
+                        if recording:
+                            save_audio()
                         w_pressed = False
-                        p_pressed = False
+                        r_pressed = False
                         e_pressed = True
                         start_recording()
                 elif event.key == pygame.K_r:
                     if not r_pressed:
-                        save_audio()
+                        if recording:
+                            save_audio()
                         w_pressed = False
                         r_pressed = True
                         e_pressed = False
@@ -168,7 +171,6 @@ def pygame_thread(audio):
                 elif event.key == pygame.K_t:
                     TEST = not TEST
                     changePaths(TEST)
-
 
         if recording:
             elapsed_time = time.time() - start_time
