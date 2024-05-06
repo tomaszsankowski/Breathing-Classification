@@ -17,7 +17,7 @@
 
 import numpy as np
 
-import vggish_params
+import model.vggish_params as vggish_params
 
 
 class Postprocessor(object):

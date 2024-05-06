@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import threading
 import numpy as np
 import tensorflow.compat.v1 as tf
-from model import vggish_input, vggish_params, vggish_slim
+from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
 
 # ###########################################################################################
@@ -23,10 +23,12 @@ AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 44100
+RATE = 48000
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
+VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 
+pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
 
 class SharedAudioResource:
     buffer = None
@@ -95,7 +97,8 @@ def pygame_thread(audio):
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
-            df = pd.DataFrame(embedding_batch)
+            postprocessed_batch = pproc.postprocess(embedding_batch)
+            df = pd.DataFrame(postprocessed_batch)
 
             prediction = rf_classifier.predict(df)
             if len(prediction_arr) == 5:
