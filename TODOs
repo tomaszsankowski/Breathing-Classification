@@ -1,5 +1,0 @@
-# TODO : I think we do not compare the model's predictions to Y_test in random_forest.py ( last section )
-
-# TODO : RECORD A LOT OF INHALES AND EXHALES
-
-# TODO : It would be best to add a third feature, so there would be 3: inhale, exhale and silence
