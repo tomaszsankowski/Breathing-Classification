@@ -4,19 +4,19 @@ import librosa
 from PIL import Image
 import numpy as np
 
-INHALE_DIR_PATH_TEST = 'data/test/inhale'
-EXHALE_DIR_PATH_TEST = 'data/test/exhale'
-SILENCE_DIR_PATH_TEST = 'data/test/silence'
-INHALE_DIR_PATH_TRAIN = 'data/train/inhale'
-EXHALE_DIR_PATH_TRAIN = 'data/train/exhale'
-SILENCE_DIR_PATH_TRAIN = 'data/train/silence'
+INHALE_DIR_PATH_TEST = '../data/test/inhale'
+EXHALE_DIR_PATH_TEST = '../data/test/exhale'
+SILENCE_DIR_PATH_TEST = '../data/test/silence'
+INHALE_DIR_PATH_TRAIN = '../data/train/inhale'
+EXHALE_DIR_PATH_TRAIN = '../data/train/exhale'
+SILENCE_DIR_PATH_TRAIN = '../data/train/silence'
 
 folder_paths = [INHALE_DIR_PATH_TEST, EXHALE_DIR_PATH_TEST, SILENCE_DIR_PATH_TEST, INHALE_DIR_PATH_TRAIN,
                 EXHALE_DIR_PATH_TRAIN, SILENCE_DIR_PATH_TRAIN]
 
-spectrogram_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms',
-                     'data/train/inhale_mel-spectrograms', 'data/train/exhale_mel-spectrograms',
-                     'data/train/silence_mel-spectrograms']
+spectrogram_paths = ['../data/test_mel-spectrograms/inhale_mel-spectrograms', '../data/test_mel-spectrograms/exhale_mel-spectrograms',
+                     '../data/test_mel-spectrograms/silence_mel-spectrograms', '../data/train_mel-spectrograms/inhale_mel-spectrograms',
+                     '../data/train_mel-spectrograms/exhale_mel-spectrograms', '../data/train_mel-spectrograms/silence_mel-spectrograms']
 
 # Define the size to which you want to scale the images
 image_size = (224, 224)

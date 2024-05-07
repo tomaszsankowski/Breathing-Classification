@@ -7,6 +7,8 @@ from tensorflow.keras.preprocessing import image
 
 test_folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms']
 
+# TODO : After finishing EfficientNet model, test the model on test data
+
 test_images = []
 test_labels = []
 for i, folder_path in enumerate(test_folder_paths):

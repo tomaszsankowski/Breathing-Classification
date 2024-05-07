@@ -3,18 +3,18 @@ import matplotlib.pyplot as plt
 import librosa
 from PIL import Image
 
-INHALE_DIR_PATH_TEST = 'data/test/inhale'
-EXHALE_DIR_PATH_TEST = 'data/test/exhale'
-SILENCE_DIR_PATH_TEST = 'data/test/silence'
-INHALE_DIR_PATH_TRAIN = 'data/train/inhale'
-EXHALE_DIR_PATH_TRAIN = 'data/train/exhale'
-SILENCE_DIR_PATH_TRAIN = 'data/train/silence'
+INHALE_DIR_PATH_TEST = '../data/test/inhale'
+EXHALE_DIR_PATH_TEST = '../data/test/exhale'
+SILENCE_DIR_PATH_TEST = '../data/test/silence'
+INHALE_DIR_PATH_TRAIN = '../data/train/inhale'
+EXHALE_DIR_PATH_TRAIN = '../data/train/exhale'
+SILENCE_DIR_PATH_TRAIN = '../data/train/silence'
 
 folder_paths = [INHALE_DIR_PATH_TEST, EXHALE_DIR_PATH_TEST, SILENCE_DIR_PATH_TEST, INHALE_DIR_PATH_TRAIN,
                 EXHALE_DIR_PATH_TRAIN, SILENCE_DIR_PATH_TRAIN]
 
-mfcc_paths = ['data/test/inhale_mfcc', 'data/test/exhale_mfcc', 'data/test/silence_mfcc',
-              'data/train/inhale_mfcc', 'data/train/exhale_mfcc', 'data/train/silence_mfcc']
+mfcc_paths = ['../data/test_mfcc/inhale_mfcc', '../data/test_mfcc/exhale_mfcc', '../data/test_mfcc/silence_mfcc',
+              '../data/train_mfcc/inhale_mfcc', '../data/train_mfcc/exhale_mfcc', '../data/train_mfcc/silence_mfcc']
 
 # Define the size to which you want to scale the images
 image_size = (224, 224)

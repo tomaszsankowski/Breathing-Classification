@@ -9,6 +9,7 @@ from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms',
                 'data/train/inhale_mel-spectrograms', 'data/train/exhale_mel-spectrograms', 'data/train/silence_mel-spectrograms']
 
+# TODO : Correct and finish implementing EfficientNet model
 images = []
 class_labels = ['inhale', 'exhale', 'silence']
 labels = []
