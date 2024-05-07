@@ -30,6 +30,7 @@ VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 
 pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
 
+
 class SharedAudioResource:
     buffer = None
 
