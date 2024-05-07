@@ -6,8 +6,8 @@ from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
-folder_paths = ['data/test/inhale_spectrograms', 'data/test/exhale_spectrograms', 'data/test/silence_spectrograms',
-                'data/train/inhale_spectrograms', 'data/train/exhale_spectrograms', 'data/train/silence_spectrograms']
+folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms',
+                'data/train/inhale_mel-spectrograms', 'data/train/exhale_mel-spectrograms', 'data/train/silence_mel-spectrograms']
 
 images = []
 class_labels = ['inhale', 'exhale', 'silence']
@@ -46,7 +46,7 @@ model.save('model/efficientnet_model')
 
 # Test the model for test data
 
-test_folder_paths = ['data/test/inhale_spectrograms', 'data/test/exhale_spectrograms', 'data/test/silence_spectrograms']
+test_folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms']
 
 test_images = []
 test_labels = []

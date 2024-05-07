@@ -5,7 +5,7 @@ import os
 from tensorflow.keras.preprocessing import image
 # Load files
 
-test_folder_paths = ['data/test/inhale_spectrograms', 'data/test/exhale_spectrograms', 'data/test/silence_spectrograms']
+test_folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms']
 
 test_images = []
 test_labels = []
