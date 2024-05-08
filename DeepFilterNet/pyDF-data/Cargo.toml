@@ -1,0 +1,25 @@
+[package]
+name = "DeepFilterDataLoader"
+version = "0.5.7-pre"
+authors = ["Hendrik Schröter"]
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "libdfdata"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[features]
+timings = ["deep_filter/timings"]
+hdf5-static = ["deep_filter/hdf5-static"]
+
+[dependencies]
+deep_filter = { features = ["dataset", "logging", "vorbis", "flac"], path = "../libDF" }
+pyo3 = { version = "0.20", default-features = true, features = [
+  "extension-module",
+] }
+numpy = "0.20"
+log = { version = "0.4", features = ["std"] }
+crossbeam-channel = "^0.5"
+ndarray = "^0.15"

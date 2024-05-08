@@ -11,7 +11,8 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
-
+from df.enhance import enhance, init_df, load_audio, save_audio
+from df.utils import download_file
 # ###########################################################################################
 # If there's an issue with the microphone, find the index of the microphone you want to use in the console,
 # along with its sampleRate. Then, change the variable RATE below and add the parameter
@@ -29,6 +30,7 @@ CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 
 pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
+model, df_state, _ = init_df()
 
 
 class SharedAudioResource:
@@ -95,6 +97,9 @@ def pygame_thread(audio):
             wf.setframerate(RATE)
             wf.writeframes(b''.join(buffer))
             wf.close()
+            audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
+            enhanced = enhance(model, df_state, audio1, atten_lim_db=10.0)
+            save_audio("temp/temp.wav", enhanced, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))

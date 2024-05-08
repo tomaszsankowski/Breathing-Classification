@@ -16,3 +16,12 @@ librosa
 pillow
 noisereduce
 scipy
+setuptools
+requests
+h5py
+torch
+loguru
+packaging
+torchaudio
+tqdm
+typing_extensions
