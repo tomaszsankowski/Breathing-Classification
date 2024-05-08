@@ -25,3 +25,4 @@ packaging
 torchaudio
 tqdm
 typing_extensions
+deepfilternet
