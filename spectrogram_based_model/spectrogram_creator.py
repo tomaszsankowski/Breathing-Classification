@@ -18,7 +18,7 @@ spectrogram_paths = ['../data/test_mel-spectrograms/inhale_mel-spectrograms', '.
                      '../data/test_mel-spectrograms/silence_mel-spectrograms', '../data/train_mel-spectrograms/inhale_mel-spectrograms',
                      '../data/train_mel-spectrograms/exhale_mel-spectrograms', '../data/train_mel-spectrograms/silence_mel-spectrograms']
 
-# Define the size to which you want to scale the images
+# size of image in pixels
 image_size = (224, 224)
 
 for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
@@ -35,7 +35,7 @@ for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
             # Save the spectrogram as an image
             plt.imsave('temp.png', spectrogram_db)
 
-            # Open the image file with PIL and resize it
+            # Open the image file and resize it
             img = Image.open('temp.png')
             img_resized = img.resize(image_size)
 

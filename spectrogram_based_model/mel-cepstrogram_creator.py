@@ -16,7 +16,7 @@ folder_paths = [INHALE_DIR_PATH_TEST, EXHALE_DIR_PATH_TEST, SILENCE_DIR_PATH_TES
 mfcc_paths = ['../data/test_mfcc/inhale_mfcc', '../data/test_mfcc/exhale_mfcc', '../data/test_mfcc/silence_mfcc',
               '../data/train_mfcc/inhale_mfcc', '../data/train_mfcc/exhale_mfcc', '../data/train_mfcc/silence_mfcc']
 
-# Define the size to which you want to scale the images
+# size of output image in pixels
 image_size = (224, 224)
 
 for folder_path, mfcc_path in zip(folder_paths, mfcc_paths):
@@ -32,7 +32,7 @@ for folder_path, mfcc_path in zip(folder_paths, mfcc_paths):
             # Save the MFCC as an image
             plt.imsave('temp.png', mfcc)
 
-            # Open the image file with PIL and resize it
+            # Open the image file and resize it
             img = Image.open('temp.png')
             img_resized = img.resize(image_size)
 

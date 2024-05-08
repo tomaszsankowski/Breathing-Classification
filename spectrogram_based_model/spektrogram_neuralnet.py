@@ -36,13 +36,12 @@ x = GlobalAveragePooling2D()(x)
 predictions = Dense(len(np.unique(labels)), activation='softmax')(x)
 model = Model(inputs=base_model.input, outputs=predictions)
 
-# compile model
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 # train model
 model.fit(X, y, epochs=10, validation_split=0.2)
-# Save the model
 
+# Save the model
 model.save('model/efficientnet_model')
 
 # Test the model for test data
