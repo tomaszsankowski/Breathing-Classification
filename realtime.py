@@ -25,7 +25,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-INPUT_DEVICE_INDEX = 4
+
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
@@ -42,7 +42,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK,  input_device_index=INPUT_DEVICE_INDEX)
+                                  frames_per_buffer=AUDIO_CHUNK)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -120,8 +120,9 @@ def pygame_thread(audio):
             draw_text(f"Prediction {prediction_arr}", TEXT_POS, font, screen)
             print(time.time() - start_time)
             for event in pygame.event.get():
-                if event == event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
+                        print("Exiting")
                         running = False
             pygame.display.flip()
             clock.tick(60)
@@ -144,9 +145,9 @@ def plot_audio(audio1):
     line1, = axs[0].plot(x, np.random.rand(PLOT_CHUNK))
     line2, = axs[1].plot(x, np.random.rand(PLOT_CHUNK))
 
-    axs[0].set_ylim(-1500, 1500)
+    axs[0].set_ylim(-1000, 1000)
     axs[0].set_xlim(0, PLOT_CHUNK / 2)
-    axs[1].set_ylim(-1500, 1500)
+    axs[1].set_ylim(-1000, 1000)
     axs[1].set_xlim(0, PLOT_CHUNK / 2)
     ani = animation.FuncAnimation(fig, animate, frames=100, blit=True)
     plt.show()
