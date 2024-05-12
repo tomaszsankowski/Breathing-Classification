@@ -28,31 +28,22 @@ INPUT_DEVICE_INDEX = 4
 ##################################
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 
-TEST = False
 WAV_EXHALE_PATH = ""
 WAV_INHALE_PATH = ""
 WAV_SILENCE_PATH = ""
 
 
-def changePaths(test: bool):
+def initializePaths():
     global WAV_EXHALE_PATH
     global WAV_INHALE_PATH
     global WAV_SILENCE_PATH
 
-    if test:
-        WAV_EXHALE_PATH = 'data/test/exhale/'
-        WAV_INHALE_PATH = 'data/test/inhale/'
-        WAV_SILENCE_PATH = 'data/test/silence/'
-        os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
-        os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
-        os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
-    else:
-        WAV_EXHALE_PATH = 'data/train/exhale/'
-        WAV_INHALE_PATH = 'data/train/inhale/'
-        WAV_SILENCE_PATH = 'data/train/silence/'
-        os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
-        os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
-        os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
+    WAV_EXHALE_PATH = 'data/exhale/'
+    WAV_INHALE_PATH = 'data/inhale/'
+    WAV_SILENCE_PATH = 'data/silence/'
+    os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
 
 
 class SharedAudioResource:
@@ -82,15 +73,13 @@ def draw_text(text, pos, font, screen):
 
 
 def pygame_thread(audio):
-    global TEST
     pygame.init()
-    changePaths(TEST)
+    initializePaths()
     WIDTH, HEIGHT = 1366, 768
     FONT_SIZE = 24
     TIMER_POS = (WIDTH // 2, HEIGHT // 2)
     TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
     PRESS_POS = (WIDTH // 2, HEIGHT // 2 - 50)
-    TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     font = pygame.freetype.SysFont(None, FONT_SIZE)
@@ -168,9 +157,6 @@ def pygame_thread(audio):
                         r_pressed = True
                         e_pressed = False
                         start_recording()
-                elif event.key == pygame.K_t:
-                    TEST = not TEST
-                    changePaths(TEST)
 
         if recording:
             elapsed_time = time.time() - start_time
@@ -180,7 +166,7 @@ def pygame_thread(audio):
             frames.append(data)
         else:
             draw_text("W:   record inhale    |   E:   record exhale", PRESS_POS, font, screen)
-            draw_text("R:   record silence   |   T:   switch TRAIN/TEST", TIMER_POS, font, screen)
+            draw_text("R:   record silence", TIMER_POS, font, screen)
 
         if w_pressed:
             draw_text("Inhale chosen", TEXT_POS, font, screen)
@@ -188,11 +174,6 @@ def pygame_thread(audio):
             draw_text("Exhale chosen", TEXT_POS, font, screen)
         else:
             draw_text("Silence chosen", TEXT_POS, font, screen)
-
-        if TEST:
-            draw_text('Recording TEST data', TEST_POS, font, screen)
-        else:
-            draw_text('Recording TRAIN data', TEST_POS, font, screen)
 
         pygame.display.flip()
         clock.tick(60)

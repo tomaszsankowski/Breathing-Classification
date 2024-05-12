@@ -1,37 +1,31 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import pandas as pd
 import time
 import result_analysis
 import joblib
 
 ######################################################
-CSV_INHALE_TRAIN_PATH = 'data/train/csv/inhale.csv'
-CSV_EXHALE_TRAIN_PATH = 'data/train/csv/exhale.csv'
-CSV_SILENCE_TRAIN_PATH = 'data/train/csv/silence.csv'
-CSV_INHALE_TEST_PATH = 'data/test/csv/inhale.csv'
-CSV_EXHALE_TEST_PATH = 'data/test/csv/exhale.csv'
-CSV_SILENCE_TEST_PATH = 'data/test/csv/silence.csv'
+CSV_INHALE_PATH = 'data/inhale.csv'
+CSV_EXHALE_PATH = 'data/exhale.csv'
+CSV_SILENCE_PATH = 'data/silence.csv'
 MODEL_PATH = 'model/trained_model_rf.pkl'
 ######################################################
 
 # load training data
-X_train_inhale = pd.read_csv(CSV_INHALE_TRAIN_PATH)
-X_train_exhale = pd.read_csv(CSV_EXHALE_TRAIN_PATH)
-X_train_silence = pd.read_csv(CSV_SILENCE_TRAIN_PATH)
+X_inhale = pd.read_csv(CSV_INHALE_PATH)
+X_exhale = pd.read_csv(CSV_EXHALE_PATH)
+X_silence = pd.read_csv(CSV_SILENCE_PATH)
 
 # combining training data into one DataFrame
-X_train = pd.concat([X_train_inhale, X_train_exhale, X_train_silence], ignore_index=True)
+X = pd.concat([X_inhale, X_exhale, X_silence], ignore_index=True)
 
 # labeling training data
-Y_train = [0] * len(X_train_inhale) + [1] * len(X_train_exhale) + [2] * len(X_train_silence)
+Y = [0] * len(X_inhale) + [1] * len(X_exhale) + [2] * len(X_silence)
 
-X_test_exhale = pd.read_csv(CSV_EXHALE_TEST_PATH)
-X_test_inhale = pd.read_csv(CSV_INHALE_TEST_PATH)
-X_test_silence = pd.read_csv(CSV_SILENCE_TEST_PATH)
-X_test = pd.concat([X_test_inhale, X_test_exhale, X_test_silence], ignore_index=True)
-
-Y_test = [0] * len(X_test_inhale) + [1] * len(X_test_exhale) + [2] * len(X_test_silence)
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
 # creating and training classifier
 rf_classifier = RandomForestClassifier(n_estimators=30)
@@ -41,19 +35,28 @@ rf_classifier.fit(X_train, Y_train)
 scores = cross_val_score(rf_classifier, X_train, Y_train, cv=3, scoring="accuracy")
 print("Cross-validation accuracy:", scores)
 
-# error analysis
-# result_analysis.analyse_error(rf_classifier, X_train, y_train)
+# accuracy of train
+start = time.time()
+predictions_train = rf_classifier.predict(X_train)
+end = time.time()
 
-# TODO : check accuracy on test data
-# prediction
+print("Time:", end - start)
+print("Predictions on training set:", predictions_train.tolist())
+print("True labels for training set:", Y_train)
+
+# calculate the accuracy of the model on the training set
+train_accuracy = accuracy_score(Y_train, predictions_train)
+print("Train accuracy:", train_accuracy)
+
+# accuracy of test
 start = time.time()
 predictions = rf_classifier.predict(X_test)
-print("Time", time.time() - start)
-print(predictions.tolist())
-print(Y_test)
+end = time.time()
 
-X_train = pd.concat([X_train_inhale, X_train_exhale, X_train_silence, X_test_inhale, X_test_exhale, X_test_silence], ignore_index=True)
-Y_train = [0] * len(X_train_inhale) + [1] * len(X_train_exhale) + [2] * len(X_train_silence) + [0] * len(X_test_inhale) + [1] * len(X_test_exhale) + [2] * len(X_test_silence)
-rf_classifier = RandomForestClassifier(n_estimators=100)
-rf_classifier.fit(X_train, Y_train)
-joblib.dump(rf_classifier, MODEL_PATH)
+print("Time:", end - start)
+print("Predictions:", predictions.tolist())
+print("True labels:", Y_test)
+
+# calculate the accuracy of the model on the test set
+accuracy = accuracy_score(Y_test, predictions)
+print("Test accuracy:", accuracy)

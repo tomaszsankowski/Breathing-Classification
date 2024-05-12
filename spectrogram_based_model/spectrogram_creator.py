@@ -8,12 +8,11 @@ INHALE_DIR_PATH = '../data/inhale'
 EXHALE_DIR_PATH = '../data/exhale'
 SILENCE_DIR_PATH = '../data/silence'
 
-folder_paths = [INHALE_DIR_PATH_TEST, EXHALE_DIR_PATH_TEST, SILENCE_DIR_PATH_TEST, INHALE_DIR_PATH_TRAIN,
-                EXHALE_DIR_PATH_TRAIN, SILENCE_DIR_PATH_TRAIN]
+folder_paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH, SILENCE_DIR_PATH]
 
-spectrogram_paths = ['../data/test_mel-spectrograms/inhale_mel-spectrograms', '../data/test_mel-spectrograms/exhale_mel-spectrograms',
-                     '../data/test_mel-spectrograms/silence_mel-spectrograms', '../data/train_mel-spectrograms/inhale_mel-spectrograms',
-                     '../data/train_mel-spectrograms/exhale_mel-spectrograms', '../data/train_mel-spectrograms/silence_mel-spectrograms']
+spectrogram_paths = ['../data/inhale_mel-spectrograms',
+                     '../data/exhale_mel-spectrograms',
+                     '../data/silence_mel-spectrograms',]
 
 # size of image in pixels
 image_size = (224, 224)

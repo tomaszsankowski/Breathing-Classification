@@ -6,21 +6,14 @@ from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
 
 ##################################################
-TEST = False
 VGGISH_CHECKPOINT_PATH = 'model/vggish_model.ckpt'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 ##################################################
 
-if TEST:
-    CSV_PATH = 'data/test/csv/'
-    INHALE_DIR_PATH = 'data/test/inhale'
-    EXHALE_DIR_PATH = 'data/test/exhale'
-    SILENCE_DIR_PATH = 'data/test/silence'
-else:
-    CSV_PATH = 'data/train/csv/'
-    INHALE_DIR_PATH = 'data/train/inhale'
-    EXHALE_DIR_PATH = 'data/train/exhale'
-    SILENCE_DIR_PATH = 'data/train/silence'
+CSV_PATH = 'data/'
+INHALE_DIR_PATH = 'data/inhale'
+EXHALE_DIR_PATH = 'data/exhale'
+SILENCE_DIR_PATH = 'data/silence'
 
 start_time = time.time()
 os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
@@ -50,7 +43,8 @@ for path in paths:
 
                 # Transform sound waves into log mel spectrogram and pass to the VGGish model to get embeddings
                 try:
-                    [embedding_batch] = np.array(sess.run([embeddings], feed_dict={features_tensor: breathing_waveform}))
+                    [embedding_batch] = np.array(
+                        sess.run([embeddings], feed_dict={features_tensor: breathing_waveform}))
                 except Exception as e:
                     print("Error:", e)
                     continue
