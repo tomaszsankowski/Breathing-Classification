@@ -25,6 +25,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
+INPUT_DEVICE_INDEX = 4
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
@@ -41,7 +42,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK,  input_device_index=INPUT_DEVICE_INDEX)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):

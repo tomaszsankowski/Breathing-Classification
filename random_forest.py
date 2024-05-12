@@ -1,10 +1,10 @@
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pandas as pd
 import time
-import result_analysis
 import joblib
 
 ######################################################
@@ -27,8 +27,8 @@ Y = [0] * len(X_inhale) + [1] * len(X_exhale) + [2] * len(X_silence)
 
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
-# creating and training classifier
-rf_classifier = RandomForestClassifier(n_estimators=30)
+# creating and training classifier with regularization
+rf_classifier = RandomForestClassifier()
 rf_classifier.fit(X_train, Y_train)
 
 # cross-validation
@@ -60,3 +60,22 @@ print("True labels:", Y_test)
 # calculate the accuracy of the model on the test set
 accuracy = accuracy_score(Y_test, predictions)
 print("Test accuracy:", accuracy)
+
+"""
+
+# Hyperparameter tuning (checking which hyperparameters perform best)
+param_grid = {
+    'n_estimators': [10, 30, 50, 100],
+    'max_depth': [None, 10, 20, 30],
+    'ccp_alpha': [0.0, 0.01, 0.1]
+}
+
+grid_search = GridSearchCV(rf_classifier, param_grid, cv=5, scoring='accuracy')
+grid_search.fit(X_train, Y_train)
+
+print("Best parameters: ", grid_search.best_params_)
+print("Best score: ", grid_search.best_score_)
+
+# Best parameters:  {'ccp_alpha': 0.0, 'max_depth': None, 'n_estimators': 100}
+
+"""
