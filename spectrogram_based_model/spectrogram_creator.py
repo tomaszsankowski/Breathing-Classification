@@ -4,12 +4,9 @@ import librosa
 from PIL import Image
 import numpy as np
 
-INHALE_DIR_PATH_TEST = '../data/test/inhale'
-EXHALE_DIR_PATH_TEST = '../data/test/exhale'
-SILENCE_DIR_PATH_TEST = '../data/test/silence'
-INHALE_DIR_PATH_TRAIN = '../data/train/inhale'
-EXHALE_DIR_PATH_TRAIN = '../data/train/exhale'
-SILENCE_DIR_PATH_TRAIN = '../data/train/silence'
+INHALE_DIR_PATH = '../data/inhale'
+EXHALE_DIR_PATH = '../data/exhale'
+SILENCE_DIR_PATH = '../data/silence'
 
 folder_paths = [INHALE_DIR_PATH_TEST, EXHALE_DIR_PATH_TEST, SILENCE_DIR_PATH_TEST, INHALE_DIR_PATH_TRAIN,
                 EXHALE_DIR_PATH_TRAIN, SILENCE_DIR_PATH_TRAIN]
