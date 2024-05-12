@@ -33,8 +33,8 @@ for i, folder_path in enumerate(folder_paths):
             else:
                 labels.append(2)
 
-total_samples = 50
-test_samples = 10
+total_samples = 100
+test_samples = 20
 train_samples = total_samples - test_samples
 
 indices = random.sample(range(len(images)), total_samples)
@@ -68,7 +68,7 @@ model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accur
 model.fit(X_train, Y_train, epochs=10, validation_split=0.2)
 
 # Save the model
-model.save('mel-spectrogram_efficientnet_model.karas')
+model.save('mel-spectrogram_efficientnet_model.keras')
 
 # Test the model for test data
 
