@@ -1,4 +1,6 @@
 import os
+import random
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
@@ -6,8 +8,12 @@ from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
-folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms',
-                'data/train/inhale_mel-spectrograms', 'data/train/exhale_mel-spectrograms', 'data/train/silence_mel-spectrograms']
+INHALE_PATH = '../data/mel-spectrograms/inhale_mel-spectrograms'
+EXHALE_PATH = '../data/mel-spectrograms/exhale_mel-spectrograms'
+SILENCE_PATH = '../data/mel-spectrograms/silence_mel-spectrograms'
+
+folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
+
 
 # TODO : Correct and finish implementing EfficientNet model
 images = []
@@ -20,15 +26,35 @@ for i, folder_path in enumerate(folder_paths):
             img = image.load_img(file_path, target_size=(224, 224))
             img_array = image.img_to_array(img)
             images.append(img_array)
-            if file_path.startswith("data/train/inhale") or file_path.startswith("data/test/inhale"):
+            if file_path.startswith(INHALE_PATH):
                 labels.append(0)
-            elif file_path.startswith("data/train/exhale") or file_path.startswith("data/test/exhale"):
+            elif file_path.startswith(EXHALE_PATH):
                 labels.append(1)
             else:
                 labels.append(2)
 
-X = np.array(images)
-y = tf.keras.utils.to_categorical(labels)
+total_samples = 50
+test_samples = 10
+train_samples = total_samples - test_samples
+
+indices = random.sample(range(len(images)), total_samples)
+
+train_indices = indices[:train_samples]
+test_indices = indices[train_samples:]
+
+# Prepare training and test data
+images_train = [images[i] for i in train_indices]
+labels_train = [labels[i] for i in train_indices]
+
+images_test = [images[i] for i in test_indices]
+labels_test = [labels[i] for i in test_indices]
+
+# Convert lists to numpy arrays
+X_train = np.array(images_train)
+Y_train = tf.keras.utils.to_categorical(np.array(labels_train))
+
+X_test = np.array(images_test)
+Y_test = tf.keras.utils.to_categorical(np.array(labels_test))
 
 base_model = EfficientNetB0(weights='imagenet', include_top=False)
 x = base_model.output
@@ -39,28 +65,12 @@ model = Model(inputs=base_model.input, outputs=predictions)
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 # train model
-model.fit(X, y, epochs=10, validation_split=0.2)
+model.fit(X_train, Y_train, epochs=10, validation_split=0.2)
 
 # Save the model
-model.save('model/efficientnet_model')
+model.save('mel-spectrogram_efficientnet_model.karas')
 
 # Test the model for test data
 
-test_folder_paths = ['data/test/inhale_mel-spectrograms', 'data/test/exhale_mel-spectrograms', 'data/test/silence_mel-spectrograms']
-
-test_images = []
-test_labels = []
-for i, folder_path in enumerate(test_folder_paths):
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.png'):
-            file_path = os.path.join(folder_path, filename)
-            img = image.load_img(file_path, target_size=(224, 224))
-            img_array = image.img_to_array(img)
-            test_images.append(img_array)
-            test_labels.append(i)
-
-X_test = np.array(test_images)
-y_test = tf.keras.utils.to_categorical(test_labels)
-
-loss, accuracy = model.evaluate(X_test, y_test)
+loss, accuracy = model.evaluate(X_test, Y_test)
 print(f'Test loss: {loss}, Test accuracy: {accuracy}')
