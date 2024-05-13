@@ -105,7 +105,9 @@ def pygame_thread(audio):
             buffer = []
             for i in range(0, (RATE // AUDIO_CHUNK // 2)):
                 buffer.append(audio.read(AUDIO_CHUNK))
+
             buffer = buffer * 2
+
             wf = wave.open("temp/temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(audio.p.get_sample_size(FORMAT))
