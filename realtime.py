@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import threading
 import numpy as np
 import tensorflow.compat.v1 as tf
+from matplotlib.patches import Rectangle
+
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
 from df.enhance import enhance, init_df, load_audio, save_audio
@@ -136,48 +138,74 @@ def pygame_thread(audio):
 
 length = int(1000 * 44100 / (1000 * 1))
 plotdata = np.zeros((length, 1))
+predictions = np.zeros((length, 1))
 q = queue.Queue()
 
+fig, ax = plt.subplots(figsize=(8, 4))
+lines, = ax.plot(plotdata, color=(0, 1, 0.29))
+ax.set_facecolor((0, 0, 0))
+ax.set_ylim(-3000, 3000)
+xes = [i for i in range(44100)]
 
-def plot_audio(audio1):
-    def update_plot(frame):
-        global plotdata
-        if q.empty():
-            data = audio1.pred_aud_buffer.get(block=True)
-            for byteArr in data[1]:
-                q.put((data[0], byteArr))
+fill_red = ax.fill_between(xes, -3000, 3000,
+                           where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
+                           color='red', alpha=0.3)
+fill_green = ax.fill_between(xes, -3000, 3000,
+                             where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
+                             color='green', alpha=0.3)
 
-        print("pred buffer: ", audio1.pred_aud_buffer.qsize())
-        print("q: ", q.qsize())
-        queue_data = q.get()
-        frames = np.frombuffer(queue_data[1], dtype=np.int16)
-        frames = frames[::2]
-        shift = len(frames)
-        plotdata = np.roll(plotdata, -shift, axis=0)
-        plotdata[-shift:, 0] = frames
-        prediction = queue_data[0]
-        if prediction == 0:
-            lines.set_color('red')
-        elif prediction == 1:
-            lines.set_color('blue')
-        else:
-            lines.set_color('green')
-        lines.set_ydata(plotdata)
-        return lines,
+fill_yellow = ax.fill_between(xes, -3000, 3000,
+                              where=(
+                                  [True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
+                              color='yellow', alpha=0.3)
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    lines, = ax.plot(plotdata, color=(0, 1, 0.29))
-    ax.set_facecolor((0, 0, 0))
-    ax.set_ylim(-3000,3000)
 
-    ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
-    plt.show()
+def update_plot(frame):
+    global plotdata, predictions, fill_red, fill_green, fill_yellow, xes
+
+    if q.empty():
+        data = audio.pred_aud_buffer.get(block=True)
+        chunks = np.array_split(data[1], 4)
+        for chunk in chunks:
+            q.put((data[0], chunk))
+
+    queue_data = q.get()
+    frames = np.frombuffer(queue_data[1], dtype=np.int16)
+    frames = frames[::2]
+    shift = len(frames)
+
+    plotdata = np.roll(plotdata, -shift, axis=0)
+    plotdata[-shift:, 0] = frames
+
+    prediction = queue_data[0]
+    predictions = np.roll(predictions, -shift, axis=0)
+    pred_arr = [prediction for _ in range(shift)]
+    predictions[-shift:, 0] = pred_arr
+
+    lines.set_ydata(plotdata)
+
+    fill_red.remove()
+    fill_green.remove()
+    fill_yellow.remove()
+
+    fill_red = ax.fill_between(xes, -3000, 3000,
+                               where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
+                               color='red', alpha=0.3)
+    fill_green = ax.fill_between(xes, -3000, 3000,
+                                 where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
+                                 color='green', alpha=0.3)
+    fill_yellow = ax.fill_between(xes, -3000, 3000,
+                                  where=([True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
+                                  color='yellow', alpha=0.3)
+
+    return lines, fill_red, fill_green, fill_yellow
 
 
 if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    plot_audio(audio)
+    ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
+    plt.show()
     pygame_thread_instance.join()
     audio.close()
