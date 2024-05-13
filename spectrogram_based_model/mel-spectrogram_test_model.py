@@ -2,8 +2,8 @@ import os
 import random
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
 
 INHALE_PATH = '../data/mel-spectrograms/inhale_mel-spectrograms'
 EXHALE_PATH = '../data/mel-spectrograms/exhale_mel-spectrograms'
@@ -32,7 +32,7 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(2)
 
 # Select 50 random samples
-SAMPLES_TO_CHECK = 3000  # 4272
+SAMPLES_TO_CHECK = 1000  # 4272
 
 indices = random.sample(range(len(images)), SAMPLES_TO_CHECK)
 
