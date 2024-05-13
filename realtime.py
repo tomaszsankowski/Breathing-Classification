@@ -13,6 +13,8 @@ from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
 from df.enhance import enhance, init_df, load_audio, save_audio
 from df.utils import download_file
+import queue
+
 # ###########################################################################################
 # If there's an issue with the microphone, find the index of the microphone you want to use in the console,
 # along with its sampleRate. Then, change the variable RATE below and add the parameter
@@ -36,6 +38,7 @@ model, df_state, _ = init_df()
 
 class SharedAudioResource:
     buffer = None
+    pred_aud_buffer = queue.Queue()
 
     def __init__(self):
         self.p = pyaudio.PyAudio()
@@ -108,6 +111,7 @@ def pygame_thread(audio):
             df = pd.DataFrame(postprocessed_batch)
 
             prediction = rf_classifier.predict(df)
+            audio.pred_aud_buffer.put((prediction[0], buffer))
             if len(prediction_arr) == 5:
                 prediction_arr = []
             if prediction[0] == 0:
@@ -130,26 +134,43 @@ def pygame_thread(audio):
     pygame.quit()
 
 
+length = int(1000 * 44100 / (1000 * 1))
+plotdata = np.zeros((length, 1))
+q = queue.Queue()
+
+
 def plot_audio(audio1):
-    def animate(i):
-        frames = audio1.buffer
-        data = np.frombuffer(frames, dtype=np.int16)
-        left_channel = data[::2]  # even index: left channel
-        right_channel = data[1::2]  # odd index: right channel
-        line1.set_ydata(left_channel)
-        line2.set_ydata(right_channel)
-        return line1, line2,
+    def update_plot(frame):
+        global plotdata
+        if q.empty():
+            data = audio1.pred_aud_buffer.get(block=True)
+            for byteArr in data[1]:
+                q.put((data[0], byteArr))
 
-    fig, axs = plt.subplots(2)
-    x = np.arange(0, 2 * PLOT_CHUNK, 2)
-    line1, = axs[0].plot(x, np.random.rand(PLOT_CHUNK))
-    line2, = axs[1].plot(x, np.random.rand(PLOT_CHUNK))
+        print("pred buffer: ", audio1.pred_aud_buffer.qsize())
+        print("q: ", q.qsize())
+        queue_data = q.get()
+        frames = np.frombuffer(queue_data[1], dtype=np.int16)
+        frames = frames[::2]
+        shift = len(frames)
+        plotdata = np.roll(plotdata, -shift, axis=0)
+        plotdata[-shift:, 0] = frames
+        prediction = queue_data[0]
+        if prediction == 0:
+            lines.set_color('red')
+        elif prediction == 1:
+            lines.set_color('blue')
+        else:
+            lines.set_color('green')
+        lines.set_ydata(plotdata)
+        return lines,
 
-    axs[0].set_ylim(-1000, 1000)
-    axs[0].set_xlim(0, PLOT_CHUNK / 2)
-    axs[1].set_ylim(-1000, 1000)
-    axs[1].set_xlim(0, PLOT_CHUNK / 2)
-    ani = animation.FuncAnimation(fig, animate, frames=100, blit=True)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    lines, = ax.plot(plotdata, color=(0, 1, 0.29))
+    ax.set_facecolor((0, 0, 0))
+    ax.set_ylim(-3000,3000)
+
+    ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
     plt.show()
 
 
