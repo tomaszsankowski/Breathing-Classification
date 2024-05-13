@@ -28,7 +28,7 @@ AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 44100
+RATE = 48000
 INPUT_DEVICE_INDEX = 4
 
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
@@ -93,8 +93,10 @@ def pygame_thread(audio):
             draw_text("Press SPACE to stop", TEST_POS, font, screen)
             start_time = time.time()
             buffer = []
-            for i in range(0, (RATE // AUDIO_CHUNK)):
+            for i in range(0, (RATE // AUDIO_CHUNK) // 2):
                 buffer.append(audio.read(AUDIO_CHUNK))
+
+            buffer = buffer * 2
 
             wf = wave.open("temp/temp.wav", 'wb')
             wf.setnchannels(CHANNELS)

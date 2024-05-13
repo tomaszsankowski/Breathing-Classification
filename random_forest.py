@@ -32,6 +32,9 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_
 rf_classifier = RandomForestClassifier()
 rf_classifier.fit(X_train, Y_train)
 
+# saving the model to a file
+joblib.dump(rf_classifier, MODEL_PATH)
+
 # cross-validation
 scores = cross_val_score(rf_classifier, X_train, Y_train, cv=3, scoring="accuracy")
 print("Cross-validation accuracy:", scores)
@@ -49,7 +52,7 @@ print("True labels for training set:", Y_train)
 train_accuracy = accuracy_score(Y_train, predictions_train)
 print("Train accuracy:", train_accuracy)
 
-#analyse results
+# analyse results
 analyse_error(rf_classifier, X_train, Y_train)
 
 # accuracy of test
