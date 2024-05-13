@@ -10,6 +10,7 @@ import threading
 import numpy as np
 import tensorflow.compat.v1 as tf
 from matplotlib.patches import Rectangle
+import pygame_gui
 
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
@@ -68,13 +69,23 @@ def draw_text(text, pos, font, screen):
 def pygame_thread(audio):
     pygame.init()
     WIDTH, HEIGHT = 1366, 768
+    manager = pygame_gui.UIManager((WIDTH, HEIGHT))
     FONT_SIZE = 24
     TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
     TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
+    NOISE_POS = (WIDTH // 2, HEIGHT // 2 + 100)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     font = pygame.freetype.SysFont(None, FONT_SIZE)
     clock = pygame.time.Clock()
+
+    atten_lim_db_slider = pygame_gui.elements.UIHorizontalSlider(
+        relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 + 200), (200, 20)),
+        start_value=10.0,
+        value_range=(0.0, 70.0),
+        manager=manager
+    )
+    atten_lim_db = 10
 
     running = True
     rf_classifier = joblib.load(CLASS_MODEL_PATH)
@@ -88,15 +99,13 @@ def pygame_thread(audio):
 
         # Get the input tensor
         features_tensor = sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
-        prediction_arr = []
         while running:
-            screen.fill((0, 0, 0))
-            draw_text("Press SPACE to stop", TEST_POS, font, screen)
+            time_delta = clock.tick(60) / 1000.0
             start_time = time.time()
             buffer = []
-            for i in range(0, (RATE // AUDIO_CHUNK)):
+            for i in range(0, (RATE // AUDIO_CHUNK // 2)):
                 buffer.append(audio.read(AUDIO_CHUNK))
-
+            buffer = buffer * 2
             wf = wave.open("temp/temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(audio.p.get_sample_size(FORMAT))
@@ -104,7 +113,7 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(buffer))
             wf.close()
             audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
-            enhanced = enhance(model, df_state, audio1, atten_lim_db=10.0)
+            enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
             save_audio("temp/temp.wav", enhanced, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
@@ -114,50 +123,61 @@ def pygame_thread(audio):
 
             prediction = rf_classifier.predict(df)
             audio.pred_aud_buffer.put((prediction[0], buffer))
-            if len(prediction_arr) == 5:
-                prediction_arr = []
             if prediction[0] == 0:
-                prediction_arr.append('Inhale')
+                screen.fill(color="red")
+                draw_text(f"Inhale", TEXT_POS, font, screen)
             elif prediction[0] == 1:
-                prediction_arr.append('Exhale')
+                screen.fill(color="green")
+                draw_text(f"Exhale", TEXT_POS, font, screen)
             else:
-                prediction_arr.append('Silence')
+                screen.fill(color="blue")
+                draw_text(f"Silence", TEXT_POS, font, screen)
+            draw_text("Press SPACE to stop", TEST_POS, font, screen)
 
-            draw_text(f"Prediction {prediction_arr}", TEXT_POS, font, screen)
             print(time.time() - start_time)
+            draw_text(f"Noise reduction: {atten_lim_db} ", NOISE_POS, font, screen)
+
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         print("Exiting")
                         running = False
+
+                if event.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
+                    if event.ui_element == atten_lim_db_slider:
+                        atten_lim_db = event.value
+
+                manager.process_events(event)
+            manager.update(time_delta)
+            manager.draw_ui(screen)
             pygame.display.flip()
             clock.tick(60)
 
     pygame.quit()
 
 
-length = int(1000 * 44100 / (1000 * 1))
-plotdata = np.zeros((length, 1))
-predictions = np.zeros((length, 1))
+plotdata = np.zeros((RATE, 1))
+predictions = np.zeros((RATE, 1))
 q = queue.Queue()
-
+ymin = -1500
+ymax = 1500
 fig, ax = plt.subplots(figsize=(8, 4))
 lines, = ax.plot(plotdata, color=(0, 1, 0.29))
 ax.set_facecolor((0, 0, 0))
-ax.set_ylim(-3000, 3000)
-xes = [i for i in range(44100)]
+ax.set_ylim(ymin, ymax)
+xes = [i for i in range(RATE)]
 
-fill_red = ax.fill_between(xes, -3000, 3000,
+fill_red = ax.fill_between(xes, ymin, ymax,
                            where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
                            color='red', alpha=0.3)
-fill_green = ax.fill_between(xes, -3000, 3000,
+fill_green = ax.fill_between(xes, ymin, ymax,
                              where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
                              color='green', alpha=0.3)
 
-fill_yellow = ax.fill_between(xes, -3000, 3000,
+fill_yellow = ax.fill_between(xes, ymin, ymax,
                               where=(
                                   [True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                              color='yellow', alpha=0.3)
+                              color='blue', alpha=0.3)
 
 
 def update_plot(frame):
@@ -165,7 +185,7 @@ def update_plot(frame):
 
     if q.empty():
         data = audio.pred_aud_buffer.get(block=True)
-        chunks = np.array_split(data[1], 4)
+        chunks = np.array_split(data[1], 2)
         for chunk in chunks:
             q.put((data[0], chunk))
 
@@ -188,15 +208,15 @@ def update_plot(frame):
     fill_green.remove()
     fill_yellow.remove()
 
-    fill_red = ax.fill_between(xes, -3000, 3000,
+    fill_red = ax.fill_between(xes, ymin, ymax,
                                where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
                                color='red', alpha=0.3)
-    fill_green = ax.fill_between(xes, -3000, 3000,
+    fill_green = ax.fill_between(xes, ymin, ymax,
                                  where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
                                  color='green', alpha=0.3)
-    fill_yellow = ax.fill_between(xes, -3000, 3000,
+    fill_yellow = ax.fill_between(xes, ymin, ymax,
                                   where=([True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                                  color='yellow', alpha=0.3)
+                                  color='blue', alpha=0.3)
 
     return lines, fill_red, fill_green, fill_yellow
 
