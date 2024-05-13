@@ -28,7 +28,8 @@ AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 48000
+RATE = 44100
+INPUT_DEVICE_INDEX = 4
 
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
@@ -47,7 +48,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=INPUT_DEVICE_INDEX)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -88,9 +89,7 @@ def pygame_thread(audio):
 
         # Get the input tensor
         features_tensor = sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
-        prediction_arr = []
         while running:
-            screen.fill((0, 0, 0))
             draw_text("Press SPACE to stop", TEST_POS, font, screen)
             start_time = time.time()
             buffer = []
@@ -104,8 +103,8 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(buffer))
             wf.close()
             audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
-            enhanced = enhance(model, df_state, audio1, atten_lim_db=10.0)
-            save_audio("temp/temp.wav", enhanced, df_state.sr())
+            #  enhanced = enhance(model, df_state, audio1, atten_lim_db=10.0)
+            save_audio("temp/temp.wav", audio1, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
@@ -114,16 +113,16 @@ def pygame_thread(audio):
 
             prediction = rf_classifier.predict(df)
             audio.pred_aud_buffer.put((prediction[0], buffer))
-            if len(prediction_arr) == 5:
-                prediction_arr = []
             if prediction[0] == 0:
-                prediction_arr.append('Inhale')
+                screen.fill(color="red")
+                draw_text(f"Inhale", TEXT_POS, font, screen)
             elif prediction[0] == 1:
-                prediction_arr.append('Exhale')
+                screen.fill(color="green")
+                draw_text(f"Exhale", TEXT_POS, font, screen)
             else:
-                prediction_arr.append('Silence')
+                screen.fill(color="yellow")
+                draw_text(f"Silence", TEXT_POS, font, screen)
 
-            draw_text(f"Prediction {prediction_arr}", TEXT_POS, font, screen)
             print(time.time() - start_time)
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:

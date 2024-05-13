@@ -24,6 +24,8 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
+INPUT_DEVICE_INDEX = 4
+
 ##################################
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 
@@ -53,7 +55,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=INPUT_DEVICE_INDEX)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
