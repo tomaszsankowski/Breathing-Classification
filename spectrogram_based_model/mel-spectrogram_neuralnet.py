@@ -11,7 +11,7 @@ import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.applications import MobileNet
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
@@ -40,8 +40,8 @@ for i, folder_path in enumerate(folder_paths):
             else:
                 labels.append(2)
 
-total_samples = 100
-test_samples = 20
+total_samples = 800
+test_samples = 200
 train_samples = total_samples - test_samples
 
 indices = random.sample(range(len(images)), total_samples)
@@ -63,7 +63,7 @@ Y_train = tf.keras.utils.to_categorical(np.array(labels_train))
 X_test = np.array(images_test)
 Y_test = tf.keras.utils.to_categorical(np.array(labels_test))
 
-base_model = EfficientNetB0(weights='imagenet', include_top=False)
+base_model = MobileNet(weights='imagenet', include_top=False)
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 predictions = Dense(len(np.unique(labels)), activation='softmax')(x)
