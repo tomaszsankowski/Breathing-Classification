@@ -12,7 +12,7 @@ SILENCE_PATH = '../data/mel-spectrograms/silence_mel-spectrograms'
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
 # Load the model
-model = load_model('mel-spectrogram_efficientnet_model2.keras')
+model = load_model('mel-spectrogram_efficientnet_model1.keras')
 
 # Load the data
 images = []
@@ -32,7 +32,7 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(2)
 
 # Select 50 random samples
-SAMPLES_TO_CHECK = 1000  # 4272
+SAMPLES_TO_CHECK = 500  # 4272
 
 indices = random.sample(range(len(images)), SAMPLES_TO_CHECK)
 
