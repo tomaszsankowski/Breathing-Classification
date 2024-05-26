@@ -49,7 +49,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=4)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=6)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -117,8 +117,8 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(buffer))
             wf.close()
             audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
-            enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
-            save_audio("temp/temp.wav", enhanced, df_state.sr())
+            #enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
+            #save_audio("temp/temp.wav", enhanced, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
