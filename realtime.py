@@ -31,6 +31,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
 
+
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
@@ -48,7 +49,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=6)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -103,10 +104,11 @@ def pygame_thread(audio):
             time_delta = clock.tick(60) / 1000.0
             start_time = time.time()
             buffer = []
-            for i in range(0, (RATE // AUDIO_CHUNK // 2)):
+            for i in range(0, 23):
                 buffer.append(audio.read(AUDIO_CHUNK))
 
-            buffer = buffer * 2
+            buffer += buffer
+            #buffer = buffer + buffer[:len(buffer)//2]
 
             wf = wave.open("temp/temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
@@ -115,8 +117,8 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(buffer))
             wf.close()
             audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
-            enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
-            save_audio("temp/temp.wav", enhanced, df_state.sr())
+            #enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
+            #save_audio("temp/temp.wav", enhanced, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
@@ -158,8 +160,8 @@ def pygame_thread(audio):
     pygame.quit()
 
 
-plotdata = np.zeros((RATE, 1))
-predictions = np.zeros((RATE, 1))
+plotdata = np.zeros((RATE*2, 1))
+predictions = np.zeros((RATE*2, 1))
 q = queue.Queue()
 ymin = -1500
 ymax = 1500
@@ -167,7 +169,7 @@ fig, ax = plt.subplots(figsize=(8, 4))
 lines, = ax.plot(plotdata, color=(0, 1, 0.29))
 ax.set_facecolor((0, 0, 0))
 ax.set_ylim(ymin, ymax)
-xes = [i for i in range(RATE)]
+xes = [i for i in range(RATE*2)]
 
 fill_red = ax.fill_between(xes, ymin, ymax,
                            where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),

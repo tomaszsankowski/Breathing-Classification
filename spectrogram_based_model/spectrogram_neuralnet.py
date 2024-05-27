@@ -21,11 +21,7 @@ EXHALE_PATH = '../data/spectrograms/exhale_spectrograms'
 SILENCE_PATH = '../data/spectrograms/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
-if tf.config.list_physical_devices('GPU'):
-    print("GPU is available")
-else:
-    print("GPU is not available")
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
 
 images = []
 class_labels = ['inhale', 'exhale', 'silence']
@@ -47,7 +43,7 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(1)
             else:
                 labels.append(2)
-            if sample_count < 900:
+            if sample_count < 100:
                 indices_train.append(indice)
             else:
                 indices_test.append(indice)

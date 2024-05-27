@@ -11,7 +11,8 @@ import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.applications import MobileNet
+from tensorflow.keras.applications import EfficientNetV2B0
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
@@ -22,11 +23,14 @@ SILENCE_PATH = '../data/mel-spectrograms/silence_mel-spectrograms'
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
 
-# TODO : Correct and finish implementing EfficientNet model
 images = []
 class_labels = ['inhale', 'exhale', 'silence']
 labels = []
+indices_train = []
+indices_test = []
+indice = 0
 for i, folder_path in enumerate(folder_paths):
+    sample_count = 0
     for filename in os.listdir(folder_path):
         if filename.endswith('.png'):
             file_path = os.path.join(folder_path, filename)
@@ -39,22 +43,19 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(1)
             else:
                 labels.append(2)
-
-total_samples = 100
-test_samples = 20
-train_samples = total_samples - test_samples
-
-indices = random.sample(range(len(images)), total_samples)
-
-train_indices = indices[:train_samples]
-test_indices = indices[train_samples:]
+            if sample_count < 200:
+                indices_train.append(indice)
+            else:
+                indices_test.append(indice)
+            sample_count += 1
+            indice += 1
 
 # Prepare training and test data
-images_train = [images[i] for i in train_indices]
-labels_train = [labels[i] for i in train_indices]
+images_train = [images[i] for i in indices_train]
+labels_train = [labels[i] for i in indices_train]
 
-images_test = [images[i] for i in test_indices]
-labels_test = [labels[i] for i in test_indices]
+images_test = [images[i] for i in indices_test]
+labels_test = [labels[i] for i in indices_test]
 
 # Convert lists to numpy arrays
 X_train = np.array(images_train)
@@ -63,7 +64,17 @@ Y_train = tf.keras.utils.to_categorical(np.array(labels_train))
 X_test = np.array(images_test)
 Y_test = tf.keras.utils.to_categorical(np.array(labels_test))
 
-base_model = EfficientNetB0(weights='imagenet', include_top=False)
+'''
+base_model = MobileNet(weights='imagenet', include_top=False)
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+predictions = Dense(len(np.unique(labels)), activation='softmax')(x)
+model = Model(inputs=base_model.input, outputs=predictions)
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+'''
+
+base_model = EfficientNetV2B0(weights='imagenet', input_shape=(224, 224, 3), include_top=False)
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 predictions = Dense(len(np.unique(labels)), activation='softmax')(x)
