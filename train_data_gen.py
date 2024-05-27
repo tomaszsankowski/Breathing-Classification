@@ -24,7 +24,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
-INPUT_DEVICE_INDEX = 4
+INPUT_DEVICE_INDEX = 1
 
 ##################################
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)

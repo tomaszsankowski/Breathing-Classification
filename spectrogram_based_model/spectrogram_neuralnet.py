@@ -21,12 +21,20 @@ EXHALE_PATH = '../data/spectrograms/exhale_spectrograms'
 SILENCE_PATH = '../data/spectrograms/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
-
+if tf.config.list_physical_devices('GPU'):
+    print("GPU is available")
+else:
+    print("GPU is not available")
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 images = []
 class_labels = ['inhale', 'exhale', 'silence']
 labels = []
+indices_train = []
+indices_test = []
+indice = 0
 for i, folder_path in enumerate(folder_paths):
+    sample_count = 0
     for filename in os.listdir(folder_path):
         if filename.endswith('.png'):
             file_path = os.path.join(folder_path, filename)
@@ -39,22 +47,20 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(1)
             else:
                 labels.append(2)
+            if sample_count < 900:
+                indices_train.append(indice)
+            else:
+                indices_test.append(indice)
+            sample_count += 1
+            indice += 1
 
-total_samples = 100
-test_samples = 20
-train_samples = total_samples - test_samples
-
-indices = random.sample(range(len(images)), total_samples)
-print(indices)
-train_indices = indices[:train_samples]
-test_indices = indices[train_samples:]
 
 # Prepare training and test data
-images_train = [images[i] for i in train_indices]
-labels_train = [labels[i] for i in train_indices]
+images_train = [images[i] for i in indices_train]
+labels_train = [labels[i] for i in indices_train]
 
-images_test = [images[i] for i in test_indices]
-labels_test = [labels[i] for i in test_indices]
+images_test = [images[i] for i in indices_test]
+labels_test = [labels[i] for i in indices_test]
 
 # Convert lists to numpy arrays
 X_train = np.array(images_train)
