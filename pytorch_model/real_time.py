@@ -68,7 +68,7 @@ noise_reduction_active = False
 class RealTimeAudioClassifier:
     def __init__(self, model_path):
         self.model = AudioClassifier()
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
         self.model = self.model.to(device)
         self.model.eval()
         self.last_prediction = None
@@ -106,7 +106,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=4)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
