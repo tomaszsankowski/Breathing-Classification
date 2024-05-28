@@ -86,7 +86,8 @@ def classify_realtime_audio(spectrogram):
 
     predicted_class = np.argmax(prediction)
 
-    # Print the predicted class
+    print("Predicted class: ", predicted_class)
+
     return predicted_class
 
 

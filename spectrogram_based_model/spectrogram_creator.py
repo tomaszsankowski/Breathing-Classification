@@ -14,7 +14,7 @@ spectrogram_paths = ['../data/spectrograms/inhale_spectrograms',
                      '../data/spectrograms/exhale_spectrograms',
                      '../data/spectrograms/silence_spectrograms',]
 
-# size of image in pixels is 244x244 because of EfficientNet v2 specifications
+# size of image in pixels is 224x224 because of EfficientNet v2 specifications
 image_size = (224, 224)
 
 segment_length = 0.5  # length of segments in seconds

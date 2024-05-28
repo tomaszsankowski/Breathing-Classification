@@ -12,7 +12,7 @@ SILENCE_PATH = '../data/spectrograms/silence_spectrograms'
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
 # Load the model
-model = load_model('spectrogram_efficientnet_model(1).keras')
+model = load_model('spectrogram_efficientnet_model.keras')
 
 # Load the data
 images = []
