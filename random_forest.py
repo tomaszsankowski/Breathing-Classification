@@ -6,7 +6,7 @@ from sklearn.metrics import accuracy_score
 import pandas as pd
 import time
 import joblib
-from result_analysis import analyse_error
+from analysis.result_analysis import analyse_error
 
 ######################################################
 CSV_INHALE_PATH = 'data/inhale.csv'
@@ -52,8 +52,6 @@ print("True labels for training set:", Y_train)
 train_accuracy = accuracy_score(Y_train, predictions_train)
 print("Train accuracy:", train_accuracy)
 
-# analyse results
-analyse_error(rf_classifier, X_train, Y_train)
 
 # accuracy of test
 start = time.time()
@@ -67,6 +65,9 @@ print("True labels:", Y_test)
 # calculate the accuracy of the model on the test set
 accuracy = accuracy_score(Y_test, predictions)
 print("Test accuracy:", accuracy)
+
+# analyse results
+analyse_error(rf_classifier, X_test, Y_test)
 
 """
 
