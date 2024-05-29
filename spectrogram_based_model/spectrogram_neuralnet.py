@@ -43,7 +43,7 @@ for i, folder_path in enumerate(folder_paths):
                 labels.append(1)
             else:
                 labels.append(2)
-            if sample_count < 100:
+            if sample_count < 900:
                 indices_train.append(indice)
             else:
                 indices_test.append(indice)

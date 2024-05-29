@@ -1,8 +1,8 @@
 import queue
-import sys
 import threading
 import time
 import wave
+from tkinter import *
 
 import librosa
 import numpy as np
@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from df.enhance import init_df
-from tkinter import *
+import pandas as pd
 from DeepFilterNet.DeepFilterNet.df import enhance
 from DeepFilterNet.DeepFilterNet.df.io import load_audio, save_audio
 
@@ -22,22 +22,39 @@ from DeepFilterNet.DeepFilterNet.df.io import load_audio, save_audio
 class AudioClassifier(nn.Module):
     def __init__(self):
         super(AudioClassifier, self).__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, stride=1)
-        self.dropout1 = nn.Dropout(p=0.25)  # Dodajemy Dropout
-        self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, stride=1)
-        self.dropout2 = nn.Dropout(p=0.25)  # Dodajemy Dropout
-        self.fc1 = nn.Linear(64 * 233, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 3)  # 3 klasy: wydech, wdech, cisza
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, stride=1)
+        self.dropout1 = nn.Dropout(p=0.1)
+        self.conv2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1)
+        self.dropout2 = nn.Dropout(p=0.1)
+        self.conv3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1)  # Nowa warstwa konwolucyjna
+        self.dropout3 = nn.Dropout(p=0.1)
+
+        self.fc1 = nn.Linear(256 * 233, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 3)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
+        #print("1: ",x.shape)
         x = F.max_pool1d(x, 2)
-        x = self.dropout1(x)  # Używamy Dropout
+        #print("2: ",x.shape)
+        x = self.dropout1(x)
+
         x = F.relu(self.conv2(x))
+        #print("3: ",x.shape)
         x = F.max_pool1d(x, 2)
-        x = self.dropout2(x)  # Używamy Dropout
-        x = x.view(-1, 64 * 233)  # Zmieniamy 64 * 8 na 64 * 233
+        x = self.dropout2(x)
+
+        x = F.relu(self.conv3(x))  # Nowa warstwa konwolucyjna
+        #print("4: ",x.shape)
+        x = F.max_pool1d(x, 2)
+        #print("6: ",x.shape)
+        x = self.dropout3(x)
+        #print("7: ",x.shape)
+
+
+
+        x = x.view(-1, 256 * 233)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -56,6 +73,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
+CHUNK_SIZE = int(RATE * 0.5) * 2
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model, df_state, _ = init_df()
@@ -76,14 +94,17 @@ class RealTimeAudioClassifier:
     def predict(self, audio_path):
         y, sr = librosa.load(audio_path, sr=48000, mono=True)
 
-        frame_length = 24000  # Długość ramki w próbkach
+        frame_length = 48000  # Długość ramki w próbkach
         frames = []
         for i in range(0, len(y), frame_length):
             frame = y[i:i + frame_length]
             if len(frame) == frame_length:  # Ignorujemy ostatnią ramkę, jeśli jest krótsza
                 mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                 frames.append(mfcc)
+
         frames = np.array(frames)
+        # frames to csv
+
         frames = frames.reshape(-1)
         frames = np.expand_dims(frames, axis=0)
         frames = torch.tensor(frames).float().to(device)
@@ -106,11 +127,11 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK)
+                                  frames_per_buffer=CHUNK_SIZE)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
-        self.buffer = self.stream.read(size, exception_on_overflow=False)
+        self.buffer = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
         return self.buffer
 
     def close(self):
@@ -144,8 +165,7 @@ def pygame_thread(audio):
         time_delta = clock.tick(60) / 1000.0
         start_time = time.time()
         buffer = []
-        for i in range(0, (RATE // AUDIO_CHUNK // 2) + 1):
-            buffer.append(audio.read(AUDIO_CHUNK))
+        buffer.append(audio.read(AUDIO_CHUNK))
 
         start_time = time.time()
         wf = wave.open("../temp/temp.wav", 'wb')

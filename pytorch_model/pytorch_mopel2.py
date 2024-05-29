@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from albumentations import Compose, GaussNoise, ShiftScaleRotate, HueSaturationValue, RandomBrightnessContrast
 from torch.utils.data import Dataset, DataLoader
 import os
 import numpy as np
@@ -11,29 +12,64 @@ import librosa
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+import albumentations as A
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+def augment_mfcc(mfcc, sr=48000, n_mels=128):
+    # Add white noise
+    wn = np.random.randn(*mfcc.shape)
+    data_wn = mfcc + 0.005 * wn
+
+    # Shifting the sound
+    data_roll = np.roll(mfcc, 1600)
+
+    # Stretching the sound
+    data_stretch = librosa.effects.time_stretch(mfcc, rate=1.07)
+
+    # Write wav files
+    #librosa.output.write_wav('wn.wav', data_wn, sr)
+    #librosa.output.write_wav('roll.wav', data_roll, sr)
+    #librosa.output.write_wav('stretch.wav', data_stretch, sr)
+
+    return data_wn
 
 
 class AudioClassifier(nn.Module):
     def __init__(self):
         super(AudioClassifier, self).__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, stride=1)
-        self.dropout1 = nn.Dropout(p=0.25)
-        self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, stride=1)
-        self.dropout2 = nn.Dropout(p=0.25)
-        self.fc1 = nn.Linear(64 * 233, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 3)
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, stride=1)
+        self.dropout1 = nn.Dropout(p=0.1)
+        self.conv2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1)
+        self.dropout2 = nn.Dropout(p=0.1)
+        self.conv3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1)  # Nowa warstwa konwolucyjna
+        self.dropout3 = nn.Dropout(p=0.1)
+
+        self.fc1 = nn.Linear(256 * 233, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 3)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
+        #print("1: ",x.shape)
         x = F.max_pool1d(x, 2)
+        #print("2: ",x.shape)
         x = self.dropout1(x)
+
         x = F.relu(self.conv2(x))
+        #print("3: ",x.shape)
         x = F.max_pool1d(x, 2)
         x = self.dropout2(x)
-        x = x.view(-1, 64 * 233)
+
+        x = F.relu(self.conv3(x))  # Nowa warstwa konwolucyjna
+        #print("4: ",x.shape)
+        x = F.max_pool1d(x, 2)
+        #print("6: ",x.shape)
+        x = self.dropout3(x)
+        #print("7: ",x.shape)
+
+        x = x.view(-1, 256 * 233)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -63,7 +99,7 @@ if __name__ == '__main__':
     print("Model created, time: ", time.time() - start_time)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
     exhale_dir = '../data/exhale'
     inhale_dir = '../data/inhale'
@@ -73,7 +109,7 @@ if __name__ == '__main__':
     inhale_files = [os.path.join(inhale_dir, file) for file in os.listdir(inhale_dir)]
     silence_files = [os.path.join(silence_dir, file) for file in os.listdir(silence_dir)]
 
-    frame_length = 24000
+    frame_length = 48000
 
     train_data = []
     files_list = [exhale_files, inhale_files, silence_files]
@@ -91,6 +127,7 @@ if __name__ == '__main__':
                 if len(frame) == frame_length:  # Ignorujemy ostatnią ramkę, jeśli jest krótsza
                     mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                     train_data.append((mfcc, label))
+
         #print(files_names[label], " loaded, size: ", len(train_data), " frames")
         if label == 0:
             exhale_frames_size = len(train_data)
@@ -133,6 +170,7 @@ if __name__ == '__main__':
             labels = labels.to(device)
 
             optimizer.zero_grad()
+
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
