@@ -12,7 +12,6 @@ import librosa
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import albumentations as A
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

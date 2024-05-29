@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 from matplotlib.patches import Rectangle
 import pygame_gui
+from tkinter import *
 
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
@@ -39,7 +40,9 @@ VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
 model, df_state, _ = init_df()
 
-
+bonus = 1.15
+noise_reduction = 10
+noise_reduction_active = False
 class SharedAudioResource:
     buffer = None
     pred_aud_buffer = queue.Queue()
@@ -49,7 +52,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=CHUNK_SIZE)
+                                  frames_per_buffer=CHUNK_SIZE, input_device_index=6)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -80,13 +83,8 @@ def pygame_thread(audio):
     font = pygame.freetype.SysFont(None, FONT_SIZE)
     clock = pygame.time.Clock()
 
-    atten_lim_db_slider = pygame_gui.elements.UIHorizontalSlider(
-        relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 + 200), (200, 20)),
-        start_value=10.0,
-        value_range=(0.0, 70.0),
-        manager=manager
-    )
-    atten_lim_db = 10
+    global bonus, noise_reduction, noise_reduction_active
+
 
     running = True
     rf_classifier = joblib.load(CLASS_MODEL_PATH)
@@ -117,8 +115,10 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(buffer))
             wf.close()
             audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
-            #enhanced = enhance(model, df_state, audio1, atten_lim_db=atten_lim_db)
-            #save_audio("temp/temp.wav", enhanced, df_state.sr())
+            if noise_reduction_active:
+                audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
+                enhanced = enhance(model, df_state, audio1, atten_lim_db=noise_reduction)
+                save_audio("temp/temp.wav", enhanced, df_state.sr())
             breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
@@ -139,17 +139,13 @@ def pygame_thread(audio):
             draw_text("Press SPACE to stop", TEST_POS, font, screen)
 
             print(time.time() - start_time)
-            draw_text(f"Noise reduction: {atten_lim_db} ", NOISE_POS, font, screen)
+            draw_text(f"Noise reduction: {noise_reduction}, active: {noise_reduction_active} ", NOISE_POS, font, screen)
 
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         print("Exiting")
                         running = False
-
-                if event.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
-                    if event.ui_element == atten_lim_db_slider:
-                        atten_lim_db = event.value
 
                 manager.process_events(event)
             manager.update(time_delta)
@@ -225,11 +221,52 @@ def update_plot(frame):
     return lines, fill_red, fill_green, fill_yellow
 
 
+def tkinker_sliders():
+    root = Tk()
+    root.title("Sliders")
+    root.geometry("600x400")
+    root.resizable(False, False)
+
+    def set_bonus(val):
+        global bonus
+        bonus = float(val)
+
+    def set_noise_reduction(val):
+        global noise_reduction
+        noise_reduction = float(val)
+
+    bonus_label = Label(root, text="Bonus")
+    bonus_label.pack()
+
+    bonus_slider = Scale(root, from_=0.1, to=5, resolution=0.1, orient=HORIZONTAL, command=set_bonus)
+    bonus_slider.set(1.15)
+    bonus_slider.pack()
+
+    noise_reduction_label = Label(root, text="Noise reduction")
+    noise_reduction_label.pack()
+
+    noise_reduction_slider = Scale(root, from_=0, to=100, resolution=0.1, orient=HORIZONTAL,
+                                   command=set_noise_reduction)
+    noise_reduction_slider.set(10)
+    noise_reduction_slider.pack()
+
+    # add button to turn off noise reduction
+    def toggle_noise_reduction():
+        global noise_reduction_active
+        noise_reduction_active = not noise_reduction_active
+
+    noise_reduction_button = Button(root, text="Toggle noise reduction", command=toggle_noise_reduction)
+    noise_reduction_button.pack()
+
+    root.mainloop()
+
+
 if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
     ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
+    tkinker_sliders()
     plt.show()
     pygame_thread_instance.join()
     audio.close()
