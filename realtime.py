@@ -30,7 +30,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-
+CHUNK_SIZE = int(RATE * 0.5) * 2
 
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
@@ -49,11 +49,11 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=6)
+                                  frames_per_buffer=CHUNK_SIZE)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
-        self.buffer = self.stream.read(size, exception_on_overflow=False)
+        self.buffer = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
         return self.buffer
 
     def close(self):
@@ -104,8 +104,8 @@ def pygame_thread(audio):
             time_delta = clock.tick(60) / 1000.0
             start_time = time.time()
             buffer = []
-            for i in range(0, 23):
-                buffer.append(audio.read(AUDIO_CHUNK))
+
+            buffer.append(audio.read(AUDIO_CHUNK))
 
             buffer += buffer
             #buffer = buffer + buffer[:len(buffer)//2]
