@@ -1,68 +1,94 @@
 import os
 import numpy as np
-import tensorflow as tf
 from tensorflow.keras import layers, models
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications import EfficientNetV2B0
+from tensorflow.keras.applications import MobileNetV2
+# from tensorflow.keras.applications import EfficientNetV2B0
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
+from tensorflow.keras import regularizers
+from tensorflow.keras.layers import Dropout
 
-# Ścieżki do katalogów ze spektrogramami
-INHALE_PATH = '/content/dataset/spectrograms/inhale_spectrograms'
-EXHALE_PATH = '/content/dataset/spectrograms/exhale_spectrograms'
-SILENCE_PATH = '/content/dataset/spectrograms/silence_spectrograms'
+# Paths to the directories with spectrograms
+INHALE_PATH = 'spectrograms/inhale_spectrograms'
+EXHALE_PATH = 'spectrograms/exhale_spectrograms'
+SILENCE_PATH = 'spectrograms/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
-# Inicjalizacja list do przechowywania danych i etykiet
-images = []
+# Initialize lists to store data and labels
+spectrograms = []
 class_labels = ['inhale', 'exhale', 'silence']
 labels = []
 
-# Wczytywanie obrazów i etykiet
+# Load spectrograms and labels
 for i, folder_path in enumerate(folder_paths):
-    ctr = 0
     for filename in os.listdir(folder_path):
-        if ctr < 700 and filename.endswith('.png'):
+        if filename.endswith('.npy'):
             file_path = os.path.join(folder_path, filename)
-            img = image.load_img(file_path, target_size=(224, 224))
-            img_array = image.img_to_array(img)
-            images.append(img_array)
+            spectrogram = np.load(file_path)
+            spectrograms.append(spectrogram)
             labels.append(i)
-            ctr += 1
 
-# Konwersja list do tablic numpy
-images = np.array(images)
+# Convert lists to numpy arrays
+spectrograms = np.array(spectrograms)
+spectrograms = np.expand_dims(spectrograms, axis=-1)  # Add channel dimension
 labels = to_categorical(np.array(labels))
 
-# Podział danych na zestawy treningowy i testowy
-X_train, X_test, Y_train, Y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
+# Split data into training, validation, and test sets
+X_train, X_test, Y_train, Y_test = train_test_split(spectrograms, labels, test_size=0.2, random_state=42)
+X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.2, random_state=42)
 
-# Użycie EfficientNetV2B0 jako bazowego modelu
-base_model = EfficientNetV2B0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+# For debugging purposes, print the shapes of the data
+print("X_train shape:", X_train.shape)
+print("X_val shape:", X_val.shape)
+print("X_test shape:", X_test.shape)
 
-# Dodanie własnych warstw
-x = base_model.output
-x = layers.GlobalAveragePooling2D()(x)
-x = layers.Dense(128, activation='relu')(x)
-x = layers.Dropout(0.5)(x)
-output_layer = layers.Dense(3, activation='softmax')(x)
+# Use MobileNetV2 as the base model
+base_model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+# base_model = EfficientNetV2B0(weights='imagenet', input_shape=(224, 224, 3), include_top=False)
+base_model.trainable = False
 
-# Definiowanie pełnego modelu
-model = models.Model(inputs=base_model.input, outputs=output_layer)
+# Add a convolutional layer to change the input shape to (224, 224, 3)
+input_layer = layers.Input(shape=(224, 224, 1))
+x = layers.Concatenate()([input_layer, input_layer, input_layer])  # Replicate to have 3 channels
+x = base_model(x)
 
-# Kompilacja modelu
+# Add a MaxPooling2D layer
+x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+
+# Add the rest of the model
+x = layers.Flatten()(x)
+
+# Dodanie warstwy Dropout
+x = Dropout(0.5)(x)
+
+# Dodanie regularyzacji L2 do warstwy wyjściowej modelu
+output_layer = layers.Dense(3, activation='softmax', kernel_regularizer=regularizers.l2(0.01))(x)
+
+
+# Define the full model
+model = models.Model(inputs=input_layer, outputs=output_layer)
+
+# Compile the model
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-# Wyświetlenie podsumowania modelu
+# Display the model summary
 model.summary()
 
-# Trenowanie modelu
-model.fit(X_train, Y_train, epochs=10, validation_split=0.2)
+# Early stopping callback
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-# Zapisanie modelu
-model.save('spectrogram_efficientnet_model.keras')
+# Train the model
+model.fit(X_train, Y_train,
+          validation_data=(X_val, Y_val),
+          epochs=50,
+          batch_size=32,
+          callbacks=[early_stopping])
 
-# Testowanie modelu na danych testowych
+# Save the model
+model.save('spectrogram_mobilenetv2_model.keras')
+
+# Test the model on the test data
 loss, accuracy = model.evaluate(X_test, Y_test)
 print(f'Test loss: {loss}, Test accuracy: {accuracy}')

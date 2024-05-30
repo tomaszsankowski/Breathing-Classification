@@ -1,8 +1,8 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy.signal import stft
+import shutil
 
 INHALE_DIR_PATH = 'train-data/inhale'
 EXHALE_DIR_PATH = 'train-data/exhale'
@@ -16,8 +16,11 @@ spectrogram_paths = ['spectrograms/inhale_spectrograms',
 
 # size of image in pixels is 224x224 because of EfficientNet v2 specifications
 
+n_fourier = 4096  # number of points for FFT
 segment_length = 0.5  # length of segments in seconds
 
+
+#  Finding max and min amplitude on every class
 global_min_inhale = np.inf
 global_max_inhale = -np.inf
 global_min_exhale = np.inf
@@ -52,6 +55,15 @@ print(global_min_inhale, global_max_inhale)
 print(global_min_exhale, global_max_exhale)
 print(global_min_silence, global_max_silence)
 
+
+# Deleting folders content
+for path in spectrogram_paths:
+    # Usuń folder i wszystko co jest w środku
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    # Stwórz folder na nowo
+    os.makedirs(path, exist_ok=True)
+
 spectrogram_max = -np.inf
 
 for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
@@ -76,15 +88,15 @@ for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
             spectrogram = np.empty((224, 224))
 
             for i, segment in enumerate(segments):
-                # Skip segment if it's shorter than 0.5 seconds
+                # Skip segment if it's shorter than segment_length seconds
                 if len(segment) < segment_frames:
                     continue
 
-                furier_hop = sample_rate * segment_length / 224
-                noverlap = np.floor(4096 - furier_hop)
+                furier_hop = np.floor(sample_rate * segment_length / 224)
+                noverlap = n_fourier - furier_hop
 
                 # Perform FFT
-                freq, time, stft_data = stft(segment, sample_rate, nperseg=4096, noverlap=noverlap, scaling='spectrum')
+                freq, time, stft_data = stft(segment, sample_rate, nperseg=n_fourier, noverlap=noverlap, scaling='spectrum')
 
                 # Finally fft_out is matrix [224,224] ready to put into spectrogram
                 spectrogram = stft_data[:224, :224]
@@ -95,6 +107,10 @@ for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
                 # import librosa
                 # spectrogram = librosa.amplitude_to_db(np.abs(spectrogram))
 
+                # nparray are used to learn as 1 dimensions
+
                 np.save(os.path.join(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.npy'), spectrogram)
-                plt.imsave(os.path.join(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.png'), spectrogram,
-                           cmap='inferno', vmin=0, vmax=25)
+
+                # Uncomment if you want to also save spectrogram images, but they are not used to learn
+                # plt.imsave(os.path.join(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.png'), spectrogram,
+                #           cmap='inferno', vmin=0, vmax=25)
