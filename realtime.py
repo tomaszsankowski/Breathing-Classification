@@ -1,5 +1,7 @@
 import time
 import wave
+from concurrent.futures import ThreadPoolExecutor
+
 import joblib
 import pygame
 import pygame.freetype
@@ -12,6 +14,7 @@ import tensorflow.compat.v1 as tf
 from matplotlib.patches import Rectangle
 import pygame_gui
 from tkinter import *
+import volume_recognition
 
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
@@ -32,6 +35,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
 CHUNK_SIZE = int(RATE * 0.5) * 2
+VR = volume_recognition.Volume_Recognition()
 
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
@@ -127,6 +131,8 @@ def pygame_thread(audio):
 
             prediction = rf_classifier.predict(df)
             audio.pred_aud_buffer.put((prediction[0], buffer))
+
+
             if prediction[0] == 0:
                 screen.fill(color="red")
                 draw_text(f"Inhale", TEXT_POS, font, screen)
@@ -202,6 +208,8 @@ def update_plot(frame):
     pred_arr = [prediction for _ in range(shift)]
     predictions[-shift:, 0] = pred_arr
 
+    VR.volume_update(frames, prediction)
+
     lines.set_ydata(plotdata)
 
     fill_red.remove()
@@ -219,7 +227,6 @@ def update_plot(frame):
                                   color='blue', alpha=0.3)
 
     return lines, fill_red, fill_green, fill_yellow
-
 
 def tkinker_sliders():
     root = Tk()
@@ -261,12 +268,20 @@ def tkinker_sliders():
     root.mainloop()
 
 
+
 if __name__ == "__main__":
     audio = SharedAudioResource()
-    pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
-    pygame_thread_instance.start()
-    ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
-    tkinker_sliders()
-    plt.show()
-    pygame_thread_instance.join()
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_pygame = executor.submit(pygame_thread, audio)
+
+        future_sliders = executor.submit(tkinker_sliders)
+
+        ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
+        plt.show()
+
+
+        future_pygame.result()
+        future_sliders.result()
+
     audio.close()
