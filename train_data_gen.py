@@ -39,9 +39,9 @@ def initializePaths():
     global WAV_INHALE_PATH
     global WAV_SILENCE_PATH
 
-    WAV_EXHALE_PATH = 'train_data/exhale/'
-    WAV_INHALE_PATH = 'train_data/inhale/'
-    WAV_SILENCE_PATH = 'train_data/silence/'
+    WAV_EXHALE_PATH = 'spectrogram_based_model/train-data/exhale/'
+    WAV_INHALE_PATH = 'spectrogram_based_model/train-data/inhale/'
+    WAV_SILENCE_PATH = 'spectrogram_based_model/train-data/silence/'
     os.makedirs(os.path.dirname(WAV_EXHALE_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(WAV_INHALE_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(WAV_SILENCE_PATH), exist_ok=True)
@@ -183,6 +183,8 @@ def pygame_thread(audio):
 
 
 def plot_audio(audio1):
+    x = np.arange(0, 2 * PLOT_CHUNK, 2)  # Przenieś tę linię do góry
+
     def animate(i):
         frames = audio1.buffer
         data = np.frombuffer(frames, dtype=np.int16)
@@ -194,7 +196,6 @@ def plot_audio(audio1):
 
     fig, axs = plt.subplots(2)
     line1, = axs[0].plot(x, np.random.rand(PLOT_CHUNK))
-    x = np.arange(0, 2 * PLOT_CHUNK, 2)
     line2, = axs[1].plot(x, np.random.rand(PLOT_CHUNK))
 
     axs[0].set_ylim(-1500, 1500)

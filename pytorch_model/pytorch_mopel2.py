@@ -127,7 +127,7 @@ if __name__ == '__main__':
                     mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                     train_data.append((mfcc, label))
 
-        #print(files_names[label], " loaded, size: ", len(train_data), " frames")
+        #print(files_names[label], " loaded, size: ", len(train-data), " frames")
         if label == 0:
             exhale_frames_size = len(train_data)
             print("Exhale frames size: ", exhale_frames_size)
