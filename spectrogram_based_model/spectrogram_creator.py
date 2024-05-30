@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import librosa
+from scipy.io import wavfile
+from scipy.signal import stft
 
 INHALE_DIR_PATH = 'train-data/inhale'
 EXHALE_DIR_PATH = 'train-data/exhale'
@@ -11,11 +12,47 @@ folder_paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH, SILENCE_DIR_PATH]
 
 spectrogram_paths = ['spectrograms/inhale_spectrograms',
                      'spectrograms/exhale_spectrograms',
-                     'spectrograms/silence_spectrograms',]
+                     'spectrograms/silence_spectrograms', ]
 
 # size of image in pixels is 224x224 because of EfficientNet v2 specifications
 
-segment_length = 0.25  # length of segments in seconds
+segment_length = 0.5  # length of segments in seconds
+
+global_min_inhale = np.inf
+global_max_inhale = -np.inf
+global_min_exhale = np.inf
+global_max_exhale = -np.inf
+global_min_silence = np.inf
+global_max_silence = -np.inf
+
+# First pass to compute global min and max
+for folder_path in folder_paths:
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.wav'):
+            file_path = os.path.join(folder_path, filename)
+
+            # Read the audio file
+            sample_rate, data = wavfile.read(file_path)
+
+            # Convert stero to mono
+            if data.ndim == 2:
+                data = data.mean(axis=1)
+
+            if folder_path == INHALE_DIR_PATH:
+                global_min_inhale = min(global_min_inhale, data.min())
+                global_max_inhale = max(global_max_inhale, data.max())
+            elif folder_path == EXHALE_DIR_PATH:
+                global_min_exhale = min(global_min_exhale, data.min())
+                global_max_exhale = max(global_max_exhale, data.max())
+            elif folder_path == SILENCE_DIR_PATH:
+                global_min_silence = min(global_min_silence, data.min())
+                global_max_silence = max(global_max_silence, data.max())
+
+print(global_min_inhale, global_max_inhale)
+print(global_min_exhale, global_max_exhale)
+print(global_min_silence, global_max_silence)
+
+spectrogram_max = -np.inf
 
 for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
     os.makedirs(spectrogram_path, exist_ok=True)
@@ -24,10 +61,14 @@ for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
             file_path = os.path.join(folder_path, filename)
 
             # Read the audio file
-            data, sr = librosa.load(file_path)
+            sample_rate, data = wavfile.read(file_path)
+
+            # Convert stero to mono
+            if data.ndim == 2:
+                data = data.mean(axis=1)
 
             # Calculate the number of frames in segment_length seconds
-            segment_frames = int(segment_length * sr)
+            segment_frames = int(segment_length * sample_rate)
 
             # Split the audio into segments
             segments = [data[i:i + segment_frames] for i in range(0, len(data), segment_frames)]
@@ -39,20 +80,21 @@ for folder_path, spectrogram_path in zip(folder_paths, spectrogram_paths):
                 if len(segment) < segment_frames:
                     continue
 
+                furier_hop = sample_rate * segment_length / 224
+                noverlap = np.floor(4096 - furier_hop)
+
                 # Perform FFT
-                fft_out = np.fft.rfft(segment, n=512)
+                freq, time, stft_data = stft(segment, sample_rate, nperseg=4096, noverlap=noverlap, scaling='spectrum')
 
-                # Select the range from 5kHz to 15kHz
-                start_index = int(5000 * len(fft_out) / sample_rate)
-                end_index = int(15000 * len(fft_out) / sample_rate)
-                fft_out = fft_out[start_index:end_index]
+                # Finally fft_out is matrix [224,224] ready to put into spectrogram
+                spectrogram = stft_data[:224, :224]
 
-                # Resample to 224 points
-                fft_out_resampled = np.interp(np.linspace(0, len(fft_out), 224), np.arange(len(fft_out)),
-                                              np.abs(fft_out))
+                spectrogram = np.abs(spectrogram)
 
-                # Add to the spectrogram
-                spectrogram[i, :] = fft_out_resampled
+                # Unccomment if db-scale:
+                # import librosa
+                # spectrogram = librosa.amplitude_to_db(np.abs(spectrogram))
 
-                # Save the spectrogram as an image
-                plt.imsave(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.png', cmap='inferno')
+                np.save(os.path.join(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.npy'), spectrogram)
+                plt.imsave(os.path.join(spectrogram_path, f'{filename.replace(".wav", "")}_{i}.png'), spectrogram,
+                           cmap='inferno', vmin=0, vmax=25)
