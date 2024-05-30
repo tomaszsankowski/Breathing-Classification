@@ -1,6 +1,7 @@
 import time
 import wave
 from concurrent.futures import ThreadPoolExecutor
+import random
 
 import joblib
 import pygame
@@ -15,6 +16,8 @@ from matplotlib.patches import Rectangle
 import pygame_gui
 from tkinter import *
 import volume_recognition
+import concurrent.futures
+
 
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
@@ -33,7 +36,7 @@ AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 48000
+RATE = 44100
 CHUNK_SIZE = int(RATE * 0.5) * 2
 VR = volume_recognition.Volume_Recognition()
 
@@ -47,6 +50,9 @@ model, df_state, _ = init_df()
 bonus = 1.15
 noise_reduction = 10
 noise_reduction_active = False
+
+
+
 class SharedAudioResource:
     buffer = None
     pred_aud_buffer = queue.Queue()
@@ -56,7 +62,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=CHUNK_SIZE, input_device_index=6)
+                                  frames_per_buffer=CHUNK_SIZE, input_device_index=8)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -131,7 +137,6 @@ def pygame_thread(audio):
 
             prediction = rf_classifier.predict(df)
             audio.pred_aud_buffer.put((prediction[0], buffer))
-
 
             if prediction[0] == 0:
                 screen.fill(color="red")
@@ -267,21 +272,50 @@ def tkinker_sliders():
 
     root.mainloop()
 
+x_len = 100  # Liczba punktów na osi x
+y_range1 = [0, 10]  # Zakres osi y dla pierwszego wykresu
+xdata1 = list(range(0, x_len))
+ydata1 = [0] * x_len
+def update_loudness_data(ydata, y_range):
+    while(1):
+        ydata.append(random.randint(y_range[0], y_range[1]))
+        ydata.pop(0)
+        time.sleep(0.01)
+
+
+def update_loudness_plot(frame, ydata, line):
+    line.set_ydata(ydata)
+    return line,
+
+fig1, ax1 = plt.subplots()
+line1, = ax1.plot(xdata1, ydata1, lw=2)
+ax1.set_ylim(y_range1)
+ax1.set_xlim([0, x_len-1])
+ax1.set_xlabel('Czas')
+ax1.set_ylabel('Wartość')
+ax1.set_title('Wykres 1 w czasie rzeczywistym')
+
 
 
 if __name__ == "__main__":
     audio = SharedAudioResource()
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         future_pygame = executor.submit(pygame_thread, audio)
 
         future_sliders = executor.submit(tkinker_sliders)
 
         ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
+
+        #TODO nie wiem czy to dziala na threadach
+        #future_pygame.result()
+        #future_sliders.result()
+        executor.submit(future_pygame.result)
+        executor.submit(future_sliders.result)
+
+        executor.submit(update_loudness_data, ydata1, y_range1)
+        ani1 = animation.FuncAnimation(fig1, update_loudness_plot, fargs=(ydata1, line1), interval=100, blit=True)
+
         plt.show()
-
-
-        future_pygame.result()
-        future_sliders.result()
 
     audio.close()
