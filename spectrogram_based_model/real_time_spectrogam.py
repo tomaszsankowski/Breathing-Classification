@@ -1,17 +1,12 @@
 import numpy as np
 from tensorflow.keras.models import load_model
-import librosa
 import pyaudio
 import queue
 import pygame
 import pygame_gui
 import time
 import threading
-from PIL import Image
-from tensorflow.keras.preprocessing import image
-import datetime
 from matplotlib import pyplot as plt
-from tensorflow.keras.preprocessing.image import save_img
 from scipy.signal import stft
 
 # Load the model

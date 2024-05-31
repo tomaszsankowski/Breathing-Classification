@@ -9,10 +9,15 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers import Dropout
 
-# Paths to the directories with spectrograms
-INHALE_PATH = 'spectrograms/inhale_spectrograms'
-EXHALE_PATH = 'spectrograms/exhale_spectrograms'
-SILENCE_PATH = 'spectrograms/silence_spectrograms'
+# Paths to smaller, handly filtered dataset
+# INHALE_PATH = 'spectrograms/inhale_spectrograms'
+# EXHALE_PATH = 'spectrograms/exhale_spectrograms'
+# SILENCE_PATH = 'spectrograms/silence_spectrograms'
+
+# Paths to bigger but less quality dataset
+INHALE_PATH = 'spectrograms1/inhale_spectrograms'
+EXHALE_PATH = 'spectrograms1/exhale_spectrograms'
+SILENCE_PATH = 'spectrograms1/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
