@@ -1,29 +1,31 @@
 import numpy as np
 from tensorflow.keras.models import load_model
 import librosa
-import matplotlib.pyplot as plt
 import pyaudio
 import queue
 import pygame
 import pygame_gui
 import time
-import os
 import threading
-import matplotlib.animation as animation
 from PIL import Image
 from tensorflow.keras.preprocessing import image
 import datetime
 from matplotlib import pyplot as plt
 from tensorflow.keras.preprocessing.image import save_img
+from scipy.signal import stft
 
 # Load the model
-model = load_model('spectrogram_efficientnet_model.keras')
+model = load_model('model_4096_05_small_.keras')
+
+REFRESH_TIME = 0.5
+N_FOURIER = 4096
 
 AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
+DEVICE_INDEX = 4
 
 
 class SharedAudioResource:
@@ -35,11 +37,18 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=4)
+                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=DEVICE_INDEX)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
         self.buffer = self.stream.read(size, exception_on_overflow=False)
+
+        # Convert stereo to mono
+        data = np.frombuffer(self.buffer, dtype=np.int16)
+        mono_data = (data[::2] + data[1::2]) / 2
+
+        self.buffer = mono_data.astype(np.int16)
+
         return self.buffer
 
     def close(self):
@@ -55,40 +64,33 @@ def draw_text(text, pos, font, screen):
 
 # Function to create a spectrogram from audio datadef create_spectrogram(frames):
 def create_spectrogram(frames):
-    # Compute the short-time Fourier transform
-    frames = np.frombuffer(frames, dtype=np.int16)
-    frames = frames.astype(float)
-    D = librosa.stft(frames)
-    # Convert an amplitude spectrogram to dB-scaled spectrogram.
-    spectrogram_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
+    furier_hop = np.floor(RATE * REFRESH_TIME / 224)
+    noverlap = N_FOURIER - furier_hop
 
-    # Save the spectrogram as an image
-    plt.imsave('temp.png', spectrogram_db)
+    # Perform FFT
+    stft_data = stft(frames, RATE, nperseg=N_FOURIER, noverlap=noverlap, scaling='spectrum')[2]
 
-    # Open the image file and resize it
-    img = Image.open('temp.png').convert('RGB')
+    spectrogram = stft_data[:224, :224]
 
-    return image.img_to_array(img.resize((224, 224)))
+    return np.abs(spectrogram)
 
 
 # Function to classify given spectrogram
 def classify_realtime_audio(spectrogram):
 
+    spectrogram = np.expand_dims(spectrogram, axis=-1)
     spectrogram = np.expand_dims(spectrogram, axis=0)
 
-    filename = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-
-    # Zapisz spektrogram do pliku przed przewidywaniem
-    save_img(f'temp/{filename}.png', spectrogram[0])
+    prediction = model.predict(spectrogram)
 
     prediction = model.predict(spectrogram)
+
+    # Set numpy print options
+    np.set_printoptions(suppress=True)
+
     print(f'Predicted class: {prediction}')
 
-    predicted_class = np.argmax(prediction)
-
-    print("Predicted class: ", predicted_class)
-
-    return predicted_class
+    return np.argmax(prediction)
 
 
 def pygame_thread(audio):
@@ -119,6 +121,7 @@ def pygame_thread(audio):
         start_time = time.time()
         buffer = audio.read(RATE // 2)
 
+        # Model predicion
         spectrogram = create_spectrogram(buffer)
         print(spectrogram.shape)
         prediction = classify_realtime_audio(spectrogram)
@@ -156,76 +159,10 @@ def pygame_thread(audio):
     pygame.quit()
 
 
-plotdata = np.zeros((RATE * 2, 1))
-predictions = np.zeros((RATE * 2, 1))
-q = queue.Queue()
-ymin = -1500
-ymax = 1500
-fig, ax = plt.subplots(figsize=(8, 4))
-lines, = ax.plot(plotdata, color=(0, 1, 0.29))
-ax.set_facecolor((0, 0, 0))
-ax.set_ylim(ymin, ymax)
-xes = [i for i in range(RATE * 2)]
-
-fill_red = ax.fill_between(xes, ymin, ymax,
-                           where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
-                           color='red', alpha=0.3)
-fill_green = ax.fill_between(xes, ymin, ymax,
-                             where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
-                             color='green', alpha=0.3)
-
-fill_yellow = ax.fill_between(xes, ymin, ymax,
-                              where=(
-                                  [True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                              color='blue', alpha=0.3)
-
-
-def update_plot(frame):
-    global plotdata, predictions, fill_red, fill_green, fill_yellow, xes
-
-    if q.empty():
-        data = audio.pred_aud_buffer.get(block=True)
-        chunks = np.array_split(data[1], 2)
-        for chunk in chunks:
-            q.put((data[0], chunk))
-
-    queue_data = q.get()
-    frames = np.frombuffer(queue_data[1], dtype=np.int16)
-    frames = frames[::2]
-    shift = len(frames)
-
-    plotdata = np.roll(plotdata, -shift, axis=0)
-    plotdata[-shift:, 0] = frames
-
-    prediction = queue_data[0]
-    predictions = np.roll(predictions, -shift, axis=0)
-    pred_arr = [prediction for _ in range(shift)]
-    predictions[-shift:, 0] = pred_arr
-
-    lines.set_ydata(plotdata)
-
-    fill_red.remove()
-    fill_green.remove()
-    fill_yellow.remove()
-
-    fill_red = ax.fill_between(xes, ymin, ymax,
-                               where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
-                               color='red', alpha=0.3)
-    fill_green = ax.fill_between(xes, ymin, ymax,
-                                 where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
-                                 color='green', alpha=0.3)
-    fill_yellow = ax.fill_between(xes, ymin, ymax,
-                                  where=([True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                                  color='blue', alpha=0.3)
-
-    return lines, fill_red, fill_green, fill_yellow
-
-
 if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
     plt.show()
     pygame_thread_instance.join()
     audio.close()

@@ -4,15 +4,15 @@ from scipy.io import wavfile
 from scipy.signal import stft
 import shutil
 
-INHALE_DIR_PATH = 'train-data/inhale'
-EXHALE_DIR_PATH = 'train-data/exhale'
-SILENCE_DIR_PATH = 'train-data/silence'
+INHALE_DIR_PATH = '../data/inhale'
+EXHALE_DIR_PATH = '../data/exhale'
+SILENCE_DIR_PATH = '../data/silence'
 
 folder_paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH, SILENCE_DIR_PATH]
 
-spectrogram_paths = ['spectrograms/inhale_spectrograms',
-                     'spectrograms/exhale_spectrograms',
-                     'spectrograms/silence_spectrograms', ]
+spectrogram_paths = ['spectrograms1/inhale_spectrograms',
+                     'spectrograms1/exhale_spectrograms',
+                     'spectrograms1/silence_spectrograms', ]
 
 # size of image in pixels is 224x224 because of EfficientNet v2 specifications
 

@@ -87,7 +87,7 @@ model.fit(X_train, Y_train,
           callbacks=[early_stopping])
 
 # Save the model
-model.save('spectrogram_mobilenetv2_model.keras')
+model.save('model_4096_05_small_.keras')
 
 # Test the model on the test data
 loss, accuracy = model.evaluate(X_test, Y_test)
