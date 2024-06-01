@@ -1,12 +1,9 @@
 import numpy as np
 from tensorflow.keras.models import load_model
-import pyaudio
-import queue
 import pygame
 import pygame_gui
 import time
-import threading
-from matplotlib import pyplot as plt
+import sounddevice as sd
 from scipy.signal import stft
 
 # Load the model
@@ -15,46 +12,43 @@ model = load_model('models_mobilenet/mobile_net_model_4096_0.5_small.keras')
 REFRESH_TIME = 0.5
 N_FOURIER = 4096
 
-AUDIO_CHUNK = 1024
-PLOT_CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 2
+CHANNELS = 1
 RATE = 44100
 DEVICE_INDEX = 4
 
 
 class SharedAudioResource:
-    buffer = None
-    pred_aud_buffer = queue.Queue()
-
     def __init__(self):
-        self.p = pyaudio.PyAudio()
-        for i in range(self.p.get_device_count()):
-            print(self.p.get_device_info_by_index(i))
-        self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=AUDIO_CHUNK, input_device_index=DEVICE_INDEX)
-        self.read(AUDIO_CHUNK)
+        self.buffer_size = int(RATE * REFRESH_TIME)
+        self.buffer = np.zeros(self.buffer_size, dtype=np.int16)
+        self.stream = sd.InputStream(
+            device=DEVICE_INDEX,
+            samplerate=RATE,
+            channels=CHANNELS,
+            dtype=np.int16,
+            callback=self._callback,
+            blocksize=self.buffer_size
+        )
 
-    def read(self, size):
-        self.buffer = self.stream.read(size, exception_on_overflow=False)
+    def _callback(self, indata, frames, time, status):
+        if status:
+            print('Error:', status)
+        self.buffer = indata.flatten().copy()
 
-        # Convert stereo to mono
-        data = np.frombuffer(self.buffer, dtype=np.int16)
-        mono_data = (data[::2] + data[1::2]) / 2
-
-        self.buffer = mono_data.astype(np.int16)
-
+    def read(self):
         return self.buffer
 
-    def close(self):
-        self.stream.stop_stream()
+    def start(self):
+        self.stream.start()
+
+    def stop(self):
+        self.stream.stop()
         self.stream.close()
-        self.p.terminate()
 
 
-def draw_text(text, pos, font, screen):
-    text_surface, _ = font.render(text, (255, 255, 255))
-    screen.blit(text_surface, (pos[0] - text_surface.get_width() // 2, pos[1] - text_surface.get_height() // 2))
+def draw_text(v_text, v_pos, v_font, v_screen):
+    text_surface, _ = v_font.render(v_text, (255, 255, 255))
+    v_screen.blit(text_surface, (v_pos[0] - text_surface.get_width() // 2, v_pos[1] - text_surface.get_height() // 2))
 
 
 # Function to create a spectrogram from audio datadef create_spectrogram(frames):
@@ -65,30 +59,27 @@ def create_spectrogram(frames):
     # Perform FFT
     stft_data = stft(frames, RATE, nperseg=N_FOURIER, noverlap=noverlap, scaling='spectrum')[2]
 
-    spectrogram = stft_data[:224, :224]
+    spectrogram_in = stft_data[:224, :224]
 
-    return np.abs(spectrogram)
+    return np.abs(spectrogram_in)
 
 
 # Function to classify given spectrogram
-def classify_realtime_audio(spectrogram):
+def classify_realtime_audio(spectrogram_in):
 
-    spectrogram = np.expand_dims(spectrogram, axis=-1)
-    spectrogram = np.expand_dims(spectrogram, axis=0)
+    spectrogram_in = np.expand_dims(spectrogram_in, axis=-1)
+    spectrogram_in = np.expand_dims(spectrogram_in, axis=0)
 
-    prediction = model.predict(spectrogram)
+    predictionon = model.predict(spectrogram_in, verbose=0)
 
-    prediction = model.predict(spectrogram)
+    print('Predicted class: ', np.array2string(np.round(predictionon, 4), suppress_small=True))
 
-    # Set numpy print options
-    np.set_printoptions(suppress=True)
-
-    print(f'Predicted class: {prediction}')
-
-    return np.argmax(prediction)
+    return np.argmax(predictionon)
 
 
-def pygame_thread(audio):
+if __name__ == "__main__":
+    audio = SharedAudioResource()
+    audio.start()
     pygame.init()
     WIDTH, HEIGHT = 1366, 768
     manager = pygame_gui.UIManager((WIDTH, HEIGHT))
@@ -101,24 +92,17 @@ def pygame_thread(audio):
     font = pygame.freetype.SysFont(None, FONT_SIZE)
     clock = pygame.time.Clock()
 
-    atten_lim_db_slider = pygame_gui.elements.UIHorizontalSlider(
-        relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 + 200), (200, 20)),
-        start_value=10.0,
-        value_range=(0.0, 70.0),
-        manager=manager
-    )
-    atten_lim_db = 10
-
     running = True
 
     while running:
         time_delta = clock.tick(60) / 1000.0
-        start_time = time.time()
-        buffer = audio.read(RATE // 2)
+        buffer = audio.read()
+        if buffer is None:
+            continue
 
         # Model predicion
         spectrogram = create_spectrogram(buffer)
-        print(spectrogram.shape)
+
         prediction = classify_realtime_audio(spectrogram)
 
         if prediction == 0:
@@ -130,20 +114,14 @@ def pygame_thread(audio):
         else:
             screen.fill(color="blue")
             draw_text(f"Silence", TEXT_POS, font, screen)
-        draw_text("Press SPACE to stop", TEST_POS, font, screen)
 
-        print(time.time() - start_time)
-        draw_text(f"Noise reduction: {atten_lim_db} ", NOISE_POS, font, screen)
+        draw_text("Press SPACE to stop", TEST_POS, font, screen)
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     print("Exiting")
                     running = False
-
-            if event.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
-                if event.ui_element == atten_lim_db_slider:
-                    atten_lim_db = event.value
 
             manager.process_events(event)
         manager.update(time_delta)
@@ -152,12 +130,4 @@ def pygame_thread(audio):
         clock.tick(60)
 
     pygame.quit()
-
-
-if __name__ == "__main__":
-    audio = SharedAudioResource()
-    pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
-    pygame_thread_instance.start()
-    plt.show()
-    pygame_thread_instance.join()
-    audio.close()
+    audio.stop()

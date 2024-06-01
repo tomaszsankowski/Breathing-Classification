@@ -27,3 +27,4 @@ tqdm
 typing_extensions
 deepfilternet
 pygame_gui
+sounddevice
