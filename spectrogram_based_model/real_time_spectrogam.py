@@ -2,15 +2,16 @@ import numpy as np
 from tensorflow.keras.models import load_model
 import pygame
 import pygame_gui
-import time
 import sounddevice as sd
 from scipy.signal import stft
 
 # Load the model
 model = load_model('models_mobilenet/mobile_net_model_4096_0.5_small.keras')
 
-REFRESH_TIME = 0.5
-N_FOURIER = 4096
+PREVIOUS_CLASS_BONUS = 0.2
+
+REFRESH_TIME = 0.25
+N_FOURIER = 2048
 
 CHANNELS = 1
 RATE = 44100
@@ -65,12 +66,17 @@ def create_spectrogram(frames):
 
 
 # Function to classify given spectrogram
+last_class = 2
 def classify_realtime_audio(spectrogram_in):
+    global last_class
 
     spectrogram_in = np.expand_dims(spectrogram_in, axis=-1)
     spectrogram_in = np.expand_dims(spectrogram_in, axis=0)
 
     predictionon = model.predict(spectrogram_in, verbose=0)
+
+    predictionon[0][last_class] += PREVIOUS_CLASS_BONUS
+    last_class = np.argmax(predictionon)
 
     print('Predicted class: ', np.array2string(np.round(predictionon, 4), suppress_small=True))
 
@@ -120,7 +126,7 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    print("Exiting")
+                    print("Exiting...")
                     running = False
 
             manager.process_events(event)
