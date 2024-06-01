@@ -10,9 +10,9 @@ SILENCE_DIR_PATH = '../data/silence'
 
 folder_paths = [INHALE_DIR_PATH, EXHALE_DIR_PATH, SILENCE_DIR_PATH]
 
-spectrogram_paths = ['../data/mel-spectrograms/inhale_mel-spectrograms',
-                     '../data/mel-spectrograms/exhale_mel-spectrograms',
-                     '../data/mel-spectrograms/silence_mel-spectrograms',]
+spectrogram_paths = ['../data/mel-spectrograms_small/inhale_mel-spectrograms_small',
+                     '../data/mel-spectrograms_small/exhale_mel-spectrograms_small',
+                     '../data/mel-spectrograms_small/silence_mel-spectrograms_small',]
 
 # size of image in pixels is 244x244 because of EfficientNet v2 specifications
 image_size = (224, 224)

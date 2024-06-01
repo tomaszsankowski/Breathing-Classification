@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from scipy.signal import stft
 
 # Load the model
-model = load_model('model_4096_05_small_.keras')
+model = load_model('models_mobilenet/mobile_net_model_4096_0.5_small.keras')
 
 REFRESH_TIME = 0.5
 N_FOURIER = 4096

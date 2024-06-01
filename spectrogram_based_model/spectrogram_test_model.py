@@ -5,9 +5,9 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 
-INHALE_PATH = 'spectrograms1/inhale_spectrograms'
-EXHALE_PATH = 'spectrograms1/exhale_spectrograms'
-SILENCE_PATH = 'spectrograms1/silence_spectrograms'
+INHALE_PATH = 'spectrograms_large/inhale_spectrograms'
+EXHALE_PATH = 'spectrograms_large/exhale_spectrograms'
+SILENCE_PATH = 'spectrograms_large/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 

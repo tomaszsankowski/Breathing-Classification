@@ -1,23 +1,38 @@
+"""
+ACCURACY RESULTS:
+n = 4096, segment_length = 0.5, small dataset:
+n = 4096, segment_length = 0.5, big dataset:
+n = 2048, segment_length = 0.5, small dataset:
+n = 2048, segment_length = 0.5, big dataset:
+n = 1024, segment_length = 0.5, small dataset:
+n = 1024, segment_length = 0.5, big dataset:
+n = 512, segment_length = 0.5, small dataset:
+n = 512, segment_length = 0.5, big dataset:
+"""
+
 import os
 import numpy as np
 from tensorflow.keras import layers, models
-from tensorflow.keras.applications import MobileNetV2
+# from tensorflow.keras.applications import MobileNetV2
 # from tensorflow.keras.applications import EfficientNetV2B0
+from tensorflow.keras.applications import VGG16
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
-from tensorflow.keras import regularizers
 from tensorflow.keras.layers import Dropout
 
-# Paths to smaller, handly filtered dataset
-# INHALE_PATH = 'spectrograms/inhale_spectrograms'
-# EXHALE_PATH = 'spectrograms/exhale_spectrograms'
-# SILENCE_PATH = 'spectrograms/silence_spectrograms'
+BIG_DATASET = False
 
-# Paths to bigger but less quality dataset
-INHALE_PATH = 'spectrograms1/inhale_spectrograms'
-EXHALE_PATH = 'spectrograms1/exhale_spectrograms'
-SILENCE_PATH = 'spectrograms1/silence_spectrograms'
+if not BIG_DATASET:
+    # Paths to smaller, handly filtered dataset
+    INHALE_PATH = 'spectrograms_small/inhale_spectrograms'
+    EXHALE_PATH = 'spectrograms_small/exhale_spectrograms'
+    SILENCE_PATH = 'spectrograms_small/silence_spectrograms'
+else:
+    # Paths to bigger but less quality dataset
+    INHALE_PATH = 'spectrograms_large/inhale_spectrograms'
+    EXHALE_PATH = 'spectrograms_large/exhale_spectrograms'
+    SILENCE_PATH = 'spectrograms_large/silence_spectrograms'
 
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
@@ -49,8 +64,9 @@ print("X_train shape:", X_train.shape)
 print("X_val shape:", X_val.shape)
 print("X_test shape:", X_test.shape)
 
-# Use MobileNetV2 as the base model
-base_model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
+# Use MobileNetV2/MobileNet/VGG16 as the base model
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+# base_model = MobileNetV2(input_shape=(224, 224, 3), include_top=False, weights='imagenet')
 # base_model = EfficientNetV2B0(weights='imagenet', input_shape=(224, 224, 3), include_top=False)
 base_model.trainable = False
 
@@ -65,11 +81,11 @@ x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 # Add the rest of the model
 x = layers.Flatten()(x)
 
-# Dodanie warstwy Dropout
+# Dropout layer preventing from overfitting
 x = Dropout(0.5)(x)
 
-# Dodanie regularyzacji L2 do warstwy wyjściowej modelu
-output_layer = layers.Dense(3, activation='softmax', kernel_regularizer=regularizers.l2(0.01))(x)
+# Output layer with 3 expected classes
+output_layer = layers.Dense(3, activation='softmax')(x)
 
 
 # Define the full model
@@ -92,7 +108,7 @@ model.fit(X_train, Y_train,
           callbacks=[early_stopping])
 
 # Save the model
-model.save('model_4096_05_small_.keras')
+model.save('mobile_net/model.keras')
 
 # Test the model on the test data
 loss, accuracy = model.evaluate(X_test, Y_test)

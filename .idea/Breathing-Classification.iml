@@ -3,6 +3,9 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/spectrogram_based_model/models_mobilenet" />
+      <excludeFolder url="file://$MODULE_DIR$/spectrogram_based_model/models_vgg16" />
+      <excludeFolder url="file://$MODULE_DIR$/spectrogram_based_model/spectrograms_small" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.10 (Breathing-Classification)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
