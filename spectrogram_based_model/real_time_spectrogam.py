@@ -21,7 +21,7 @@ running = True
 
 # Load the model
 
-model = load_model(f'models_mobilenet/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
+model = load_model(f'best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
 
 
 # Audio resource class
