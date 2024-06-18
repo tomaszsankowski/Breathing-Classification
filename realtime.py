@@ -15,9 +15,7 @@ import tensorflow.compat.v1 as tf
 from matplotlib.patches import Rectangle
 import pygame_gui
 from tkinter import *
-import volume_recognition
 import concurrent.futures
-
 
 from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
 import pandas as pd
@@ -38,7 +36,6 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
 CHUNK_SIZE = int(RATE * 0.5) * 2
-VR = volume_recognition.Volume_Recognition()
 
 vggish_checkpoint_path = 'model/vggish_model.ckpt'
 CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
@@ -52,7 +49,6 @@ noise_reduction = 10
 noise_reduction_active = False
 
 
-
 class SharedAudioResource:
     buffer = None
     pred_aud_buffer = queue.Queue()
@@ -62,7 +58,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=CHUNK_SIZE, input_device_index=8)
+                                  frames_per_buffer=CHUNK_SIZE, input_device_index=4)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -94,7 +90,6 @@ def pygame_thread(audio):
     clock = pygame.time.Clock()
 
     global bonus, noise_reduction, noise_reduction_active
-
 
     running = True
     rf_classifier = joblib.load(CLASS_MODEL_PATH)
@@ -167,8 +162,8 @@ def pygame_thread(audio):
     pygame.quit()
 
 
-plotdata = np.zeros((RATE*2, 1))
-predictions = np.zeros((RATE*2, 1))
+plotdata = np.zeros((RATE * 2, 1))
+predictions = np.zeros((RATE * 2, 1))
 q = queue.Queue()
 ymin = -1500
 ymax = 1500
@@ -176,7 +171,7 @@ fig, ax = plt.subplots(figsize=(8, 4))
 lines, = ax.plot(plotdata, color=(0, 1, 0.29))
 ax.set_facecolor((0, 0, 0))
 ax.set_ylim(ymin, ymax)
-xes = [i for i in range(RATE*2)]
+xes = [i for i in range(RATE * 2)]
 
 fill_red = ax.fill_between(xes, ymin, ymax,
                            where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
@@ -213,8 +208,6 @@ def update_plot(frame):
     pred_arr = [prediction for _ in range(shift)]
     predictions[-shift:, 0] = pred_arr
 
-    VR.volume_update(frames, prediction)
-
     lines.set_ydata(plotdata)
 
     fill_red.remove()
@@ -232,6 +225,7 @@ def update_plot(frame):
                                   color='blue', alpha=0.3)
 
     return lines, fill_red, fill_green, fill_yellow
+
 
 def tkinker_sliders():
     root = Tk()
@@ -272,12 +266,15 @@ def tkinker_sliders():
 
     root.mainloop()
 
+
 x_len = 100  # Liczba punktów na osi x
 y_range1 = [0, 10]  # Zakres osi y dla pierwszego wykresu
 xdata1 = list(range(0, x_len))
 ydata1 = [0] * x_len
+
+
 def update_loudness_data(ydata, y_range):
-    while(1):
+    while (1):
         ydata.append(random.randint(y_range[0], y_range[1]))
         ydata.pop(0)
         time.sleep(0.01)
@@ -287,15 +284,14 @@ def update_loudness_plot(frame, ydata, line):
     line.set_ydata(ydata)
     return line,
 
+
 fig1, ax1 = plt.subplots()
 line1, = ax1.plot(xdata1, ydata1, lw=2)
 ax1.set_ylim(y_range1)
-ax1.set_xlim([0, x_len-1])
+ax1.set_xlim([0, x_len - 1])
 ax1.set_xlabel('Czas')
 ax1.set_ylabel('Wartość')
 ax1.set_title('Wykres 1 w czasie rzeczywistym')
-
-
 
 if __name__ == "__main__":
     audio = SharedAudioResource()
@@ -307,9 +303,9 @@ if __name__ == "__main__":
 
         ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
 
-        #TODO nie wiem czy to dziala na threadach
-        #future_pygame.result()
-        #future_sliders.result()
+        # TODO nie wiem czy to dziala na threadach
+        # future_pygame.result()
+        # future_sliders.result()
         executor.submit(future_pygame.result)
         executor.submit(future_sliders.result)
 

@@ -1,9 +1,7 @@
 import os
-import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
 
 INHALE_PATH = 'spectrograms_large/inhale_spectrograms'
 EXHALE_PATH = 'spectrograms_large/exhale_spectrograms'
@@ -12,7 +10,7 @@ SILENCE_PATH = 'spectrograms_large/silence_spectrograms'
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
 # Load the model
-model = load_model('model_4096_05_small_.keras')
+model = load_model('models_mobilenet/mobile_net_model_4096_0.5_small.keras')
 
 # Load the data
 spectrograms = []
