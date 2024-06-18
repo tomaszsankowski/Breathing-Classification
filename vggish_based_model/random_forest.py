@@ -9,9 +9,9 @@ import joblib
 from analysis.result_analysis import analyse_error
 
 ######################################################
-CSV_INHALE_PATH = 'data/inhale.csv'
-CSV_EXHALE_PATH = 'data/exhale.csv'
-CSV_SILENCE_PATH = 'data/silence.csv'
+CSV_INHALE_PATH = '../data/inhale.csv'
+CSV_EXHALE_PATH = '../data/exhale.csv'
+CSV_SILENCE_PATH = '../data/silence.csv'
 MODEL_PATH = 'model/trained_model_rf.pkl'
 ######################################################
 

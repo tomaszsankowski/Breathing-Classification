@@ -1,5 +1,5 @@
 # VGGish model
-model/vggish_model.ckpt
+vggish_based_model/model/vggish_model.ckpt
 
 # 2GBs of numpy arrays that can be made with a scrip in 10 seconds
 spectrogram_based_model/spectrograms_small

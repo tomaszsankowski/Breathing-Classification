@@ -17,7 +17,7 @@
 
 import numpy as np
 
-import model.vggish_params as vggish_params
+import vggish_based_model.model.vggish_params as vggish_params
 
 
 class Postprocessor(object):
@@ -82,9 +82,9 @@ class Postprocessor(object):
         vggish_params.QUANTIZE_MAX_VAL)
     # - convert to 8-bit in range [0.0, 255.0]
     quantized_embeddings = (
-        (clipped_embeddings - vggish_params.QUANTIZE_MIN_VAL) *
-        (255.0 /
-         (vggish_params.QUANTIZE_MAX_VAL - vggish_params.QUANTIZE_MIN_VAL)))
+            (clipped_embeddings - vggish_params.QUANTIZE_MIN_VAL) *
+            (255.0 /
+             (vggish_params.QUANTIZE_MAX_VAL - vggish_params.QUANTIZE_MIN_VAL)))
     # - cast 8-bit float to uint8
     quantized_embeddings = quantized_embeddings.astype(np.uint8)
 

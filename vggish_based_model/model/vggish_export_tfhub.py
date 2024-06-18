@@ -12,7 +12,7 @@ Usage:
 """
 
 import sys
-sys.path.append('..')  # Lets us import yamnet modules from sibling directory.
+sys.path.append('../..')  # Lets us import yamnet modules from sibling directory.
 
 import numpy as np
 import resampy
@@ -21,7 +21,6 @@ assert tf.version.VERSION >= '2.0.0', (
     'Need at least TF 2.0, you have TF v{}'.format(tf.version.VERSION))
 import tensorflow_hub as tfhub
 
-import vggish_input
 import vggish_params
 import vggish_slim
 from yamnet import features as yamnet_features

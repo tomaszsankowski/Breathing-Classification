@@ -2,7 +2,7 @@ import time
 import os
 import numpy as np
 import tensorflow.compat.v1 as tf
-from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
+from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
 import pandas as pd
 
 ##################################################
@@ -10,10 +10,10 @@ VGGISH_CHECKPOINT_PATH = 'model/vggish_model.ckpt'
 VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
 ##################################################
 
-CSV_PATH = 'data/'
-INHALE_DIR_PATH = 'data/inhale'
-EXHALE_DIR_PATH = 'data/exhale'
-SILENCE_DIR_PATH = 'data/silence'
+CSV_PATH = '../data/'
+INHALE_DIR_PATH = '../data/inhale'
+EXHALE_DIR_PATH = '../data/exhale'
+SILENCE_DIR_PATH = '../data/silence'
 
 start_time = time.time()
 os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)

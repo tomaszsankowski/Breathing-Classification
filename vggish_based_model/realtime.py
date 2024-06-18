@@ -9,18 +9,15 @@ import pygame.freetype
 import pyaudio
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import threading
 import numpy as np
 import tensorflow.compat.v1 as tf
-from matplotlib.patches import Rectangle
 import pygame_gui
 from tkinter import *
 import concurrent.futures
 
-from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
+from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
 import pandas as pd
 from df.enhance import enhance, init_df, load_audio, save_audio
-from df.utils import download_file
 import queue
 
 # ###########################################################################################
@@ -113,18 +110,18 @@ def pygame_thread(audio):
             buffer += buffer
             #buffer = buffer + buffer[:len(buffer)//2]
 
-            wf = wave.open("temp/temp.wav", 'wb')
+            wf = wave.open("../temp/temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(audio.p.get_sample_size(FORMAT))
             wf.setframerate(RATE)
             wf.writeframes(b''.join(buffer))
             wf.close()
-            audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
+            audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
             if noise_reduction_active:
-                audio1, _ = load_audio("temp/temp.wav", sr=df_state.sr())
+                audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
                 enhanced = enhance(model, df_state, audio1, atten_lim_db=noise_reduction)
-                save_audio("temp/temp.wav", enhanced, df_state.sr())
-            breathing_waveform = vggish_input.wavfile_to_examples("temp/temp.wav")
+                save_audio("../temp/temp.wav", enhanced, df_state.sr())
+            breathing_waveform = vggish_input.wavfile_to_examples("../temp/temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
             postprocessed_batch = pproc.postprocess(embedding_batch)

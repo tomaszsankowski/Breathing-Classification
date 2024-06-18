@@ -1,6 +1,5 @@
 # TODO : Make it work
 
-import time
 import wave
 import joblib
 import pygame
@@ -11,10 +10,10 @@ import matplotlib.pyplot as plt
 import threading
 import numpy as np
 import tensorflow.compat.v1 as tf
-from model import vggish_input, vggish_params, vggish_slim, vggish_postprocess
+from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
 import pandas as pd
 from df.enhance import enhance, init_df, load_audio, save_audio
-from df.utils import download_file
+
 # ###########################################################################################
 # If there's an issue with the microphone, find the index of the microphone you want to use in the console,
 # along with its sampleRate. Then, change the variable RATE below and add the parameter
@@ -27,9 +26,9 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-vggish_checkpoint_path = 'model/vggish_model.ckpt'
-CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
-VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
+vggish_checkpoint_path = 'vggish_based_model/model/vggish_model.ckpt'
+CLASS_MODEL_PATH = 'vggish_based_model/model/trained_model_rf.pkl'
+VGGISH_PARAMS_PATH = 'vggish_based_model/model/vggish_pca_params.npz'
 
 pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
 model, df_state, _ = init_df()
