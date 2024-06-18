@@ -1,11 +1,10 @@
 import numpy as np
 from tensorflow.keras.models import load_model
-import pygame
-import pygame_gui
 from scipy.signal import stft
 import pyaudio
 import matplotlib.pyplot as plt
 import time
+import pandas as pd
 
 # Constants
 
@@ -49,23 +48,24 @@ class SharedAudioResource:
         self.p.terminate()
 
 
-# Function to draw text on screen
-
-def draw_text(v_text, v_pos, v_font, v_screen):
-    text_surface, _ = v_font.render(v_text, (255, 255, 255))
-    v_screen.blit(text_surface, (v_pos[0] - text_surface.get_width() // 2, v_pos[1] - text_surface.get_height() // 2))
-
-
 # Function to create a spectrogram from audio data:
 
 def create_spectrogram(frames):
+
+    # Calculate STFT parameters
+
     furier_hop = np.floor(RATE * REFRESH_TIME / 224)
     noverlap = N_FOURIER - furier_hop
 
     # Perform FFT
+
     stft_data = stft(frames, RATE, nperseg=N_FOURIER, noverlap=noverlap, scaling='spectrum')[2]
 
+    # Take only the first 224x224 part of the spectrogram
+
     spectrogram_in = stft_data[:224, :224]
+
+    # Return spectrogram as matrix of positive values
 
     return np.abs(spectrogram_in)
 
@@ -75,15 +75,27 @@ def create_spectrogram(frames):
 def classify_realtime_audio(spectrogram_in):
     global last_prediction
 
+    # Prepare input for the model ( change dimensions )
+
     spectrogram_in = np.expand_dims(spectrogram_in, axis=-1)
     spectrogram_in = np.expand_dims(spectrogram_in, axis=0)
 
+    # Model prefiction
+
     predictionon = model.predict(spectrogram_in, verbose=0)
 
+    # Add bonus for previous class
     predictionon[0][last_prediction] += PREVIOUS_CLASS_BONUS
+
+    # Get new previous prediction
+
     last_prediction = np.argmax(predictionon)
 
+    # Print wages for every prediction
+
     print('Predicted class: ', np.array2string(np.round(predictionon, 4), suppress_small=True))
+
+    # Return predicted class number
 
     return np.argmax(predictionon)
 
@@ -102,6 +114,8 @@ fig, ax = plt.subplots(figsize=(10, 5))
 ax.plot(plotdata, color='white')
 
 
+# Key handler for plot window
+
 def on_key(event):
     global running
     if event.key == ' ':
@@ -109,15 +123,26 @@ def on_key(event):
         running = False
 
 
-fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
-fig.suptitle('Press [SPACE] to stop')  # Subtitle
-fig.canvas.mpl_connect('key_press_event', on_key)
+# Configuration of plot properties and other elements
 
-ylim = (-1500, 1500)
+fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
+fig.suptitle('Press [SPACE] to stop. Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
+
+ylim = (-500, 500)
 facecolor = (0, 0, 0)
 
 ax.set_facecolor(facecolor)
 ax.set_ylim(ylim)
+
+
+# Moving avarage function
+
+def moving_average(data, window_size):
+    data_flatten = data.flatten()
+    ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
+    ma[:window_size-1] = data_flatten[:window_size-1]  # Leave the first window_size-1 elements unchanged
+    return ma.reshape(-1, 1)
 
 
 # Plot update function
@@ -125,13 +150,21 @@ ax.set_ylim(ylim)
 def update_plot(frames, prediction):
     global plotdata, predictions, ax
 
+    # Roll signals and predictions vectors and insert new value at the end
+
     plotdata = np.roll(plotdata, -len(frames))
     plotdata[-len(frames):] = frames.reshape(-1, 1)
 
     predictions = np.roll(predictions, -1)
     predictions[-1] = prediction
 
-    ax.clear()  # Usuń poprzednie linie
+    # Moving avarage on plotdata (uncomment if needed)
+
+    plotdata = moving_average(plotdata, 50)
+
+    # Clean the plot and plot the new data
+
+    ax.clear()
 
     for i in range(0, len(predictions)):
         if predictions[i] == 0:  # Inhale
@@ -142,6 +175,8 @@ def update_plot(frames, prediction):
             color = 'blue'
         ax.plot(x_linspace[PLOT_CHUNK_SIZE*i:PLOT_CHUNK_SIZE*(i+1)], plotdata[PLOT_CHUNK_SIZE*i:PLOT_CHUNK_SIZE*(i+1)], color=color)
 
+    # Set plot properties and show it
+
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
 
@@ -150,73 +185,44 @@ def update_plot(frames, prediction):
 
 
 # Main function
-last_prediction = 2
 
 if __name__ == "__main__":
+
     # Initialize microphone
+
     audio = SharedAudioResource()
-
-    # Initialize pygame
-    pygame.init()
-    WIDTH, HEIGHT = 1366, 768
-    manager = pygame_gui.UIManager((WIDTH, HEIGHT))
-    FONT_SIZE = 24
-    TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
-    TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
-    NOISE_POS = (WIDTH // 2, HEIGHT // 2 + 100)
-
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    font = pygame.freetype.SysFont(None, FONT_SIZE)
-    clock = pygame.time.Clock()
 
     # Main loop
 
+    last_prediction = 2
     while running:
+
+        # Set timer to check how long each prediction takes
+
+        start_time = time.time()
+
         # Collect samples
 
-        time_delta = clock.tick(60) / 1000.0
-        start_time = time.time()
         buffer = audio.read()
+
         if buffer is None:
             continue
-        print(time.time() - start_time)
 
-        # Create spectrogram and make prediction
+        # Create spectrogram
 
         spectrogram = create_spectrogram(buffer)
 
+        # Make prediction
+
         prediction = classify_realtime_audio(spectrogram)
 
-        # Handle predicted class
+        # Update plot
 
-        if prediction == 0:
-            screen.fill(color="red")
-            draw_text(f"Inhale", TEXT_POS, font, screen)
-        elif prediction == 1:
-            screen.fill(color="green")
-            draw_text(f"Exhale", TEXT_POS, font, screen)
-        else:
-            screen.fill(color="blue")
-            draw_text(f"Silence", TEXT_POS, font, screen)
+        update_plot(buffer, prediction)
 
-        draw_text("Press SPACE to stop", TEST_POS, font, screen)
+        # Print time needed for this loop iteration
 
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    print("Exiting...")
-                    running = False
-            manager.process_events(event)
+        print(time.time() - start_time)
+    # Close audio
 
-        # Update and draw UI
-
-        update_plot(buffer, prediction)  # Updates signal plot
-        manager.update(time_delta)
-        manager.draw_ui(screen)
-        pygame.display.flip()
-        clock.tick(60)
-
-    # Close audio and pygame
-
-    pygame.quit()
     audio.close()
