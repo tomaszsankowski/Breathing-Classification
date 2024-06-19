@@ -15,6 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from df.enhance import init_df
 import pandas as pd
+from torch.utils.data import Dataset
+
 from DeepFilterNet.DeepFilterNet.df import enhance
 from DeepFilterNet.DeepFilterNet.df.io import load_audio, save_audio
 
@@ -22,39 +24,15 @@ from DeepFilterNet.DeepFilterNet.df.io import load_audio, save_audio
 class AudioClassifier(nn.Module):
     def __init__(self):
         super(AudioClassifier, self).__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, stride=1)
-        self.dropout1 = nn.Dropout(p=0.1)
-        self.conv2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1)
-        self.dropout2 = nn.Dropout(p=0.1)
-        self.conv3 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1)  # Nowa warstwa konwolucyjna
-        self.dropout3 = nn.Dropout(p=0.1)
-
-        self.fc1 = nn.Linear(256 * 233, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 3)
+        self.lstm = nn.LSTM(input_size=20, hidden_size=256, num_layers=3, batch_first=True, dropout=0.2)
+        self.fc1 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 3)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        #print("1: ",x.shape)
-        x = F.max_pool1d(x, 2)
-        #print("2: ",x.shape)
-        x = self.dropout1(x)
-
-        x = F.relu(self.conv2(x))
-        #print("3: ",x.shape)
-        x = F.max_pool1d(x, 2)
-        x = self.dropout2(x)
-
-        x = F.relu(self.conv3(x))  # Nowa warstwa konwolucyjna
-        #print("4: ",x.shape)
-        x = F.max_pool1d(x, 2)
-        #print("6: ",x.shape)
-        x = self.dropout3(x)
-        #print("7: ",x.shape)
-
-
-
-        x = x.view(-1, 256 * 233)
+        x = x.permute(0, 2, 1)  # Swap the dimensions for LSTM (batch, seq, feature)
+        _, (hn, _) = self.lstm(x)
+        x = hn[-1]  # Take the last hidden state
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -73,7 +51,7 @@ PLOT_CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-CHUNK_SIZE = int(RATE * 0.5) * 2
+CHUNK_SIZE = int(RATE * 0.25)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model, df_state, _ = init_df()
@@ -82,6 +60,16 @@ bonus = 1.15
 noise_reduction = 10
 noise_reduction_active = False
 
+class AudioDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        mfcc = self.data[idx]
+        return torch.tensor(mfcc).float()
 
 class RealTimeAudioClassifier:
     def __init__(self, model_path):
@@ -94,7 +82,7 @@ class RealTimeAudioClassifier:
     def predict(self, audio_path):
         y, sr = librosa.load(audio_path, sr=48000, mono=True)
 
-        frame_length = 48000  # Długość ramki w próbkach
+        frame_length = CHUNK_SIZE  # Długość ramki w próbkach
         frames = []
         for i in range(0, len(y), frame_length):
             frame = y[i:i + frame_length]
@@ -102,12 +90,12 @@ class RealTimeAudioClassifier:
                 mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                 frames.append(mfcc)
 
-        frames = np.array(frames)
-        # frames to csv
+        frames = AudioDataset(frames)
+        frames = torch.utils.data.DataLoader(frames, batch_size=1, shuffle=False)
+        for frames in frames:
+            frames = frames.to(device)
 
-        frames = frames.reshape(-1)
-        frames = np.expand_dims(frames, axis=0)
-        frames = torch.tensor(frames).float().to(device)
+
         outputs = self.model(frames)
         global bonus
         if self.last_prediction is not None:
@@ -115,6 +103,7 @@ class RealTimeAudioClassifier:
             outputs[0][self.last_prediction] *= bonus
             print("After bonus", outputs)
         _, predicted = torch.max(outputs, 1)
+        self.last_prediction = predicted.cpu().numpy()[0]
         return predicted.cpu().numpy()
 
 
@@ -127,7 +116,7 @@ class SharedAudioResource:
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=CHUNK_SIZE, input_device_index=6)
+                                  frames_per_buffer=CHUNK_SIZE, input_device_index=1)
         self.read(AUDIO_CHUNK)
 
     def read(self, size):
@@ -159,7 +148,7 @@ def pygame_thread(audio):
     clock = pygame.time.Clock()
 
     running = True
-    classifier = RealTimeAudioClassifier('audio_classifier.pth')
+    classifier = RealTimeAudioClassifier('audio_rnn_classifier.pth')
     global bonus, noise_reduction, noise_reduction_active
     while running:
         time_delta = clock.tick(60) / 1000.0
@@ -183,6 +172,7 @@ def pygame_thread(audio):
         prediction = classifier.predict('../temp/temp.wav')
         classifier.last_prediction = prediction
         print(prediction)
+        print("Time: ", time.time() - start_time)
 
         audio.pred_aud_buffer.put((prediction, buffer))
         if prediction == 0:
