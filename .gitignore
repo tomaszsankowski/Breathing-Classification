@@ -4,7 +4,6 @@ vggish_based_model/model/vggish_model.ckpt
 # 2GBs of numpy arrays that can be made with a scrip in 10 seconds
 spectrogram_based_model/spectrograms_small
 spectrogram_based_model/spectrograms_large
-spectrogram_based_model/models_vgg16
 
 # Created by https://www.toptal.com/developers/gitignore/api/windows,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,pycharm

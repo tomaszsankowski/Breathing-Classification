@@ -9,7 +9,7 @@ import pandas as pd
 # Constants
 
 REFRESH_TIME = 0.5
-N_FOURIER = 4096
+N_FOURIER = 2048
 
 PREVIOUS_CLASS_BONUS = 0.2
 
@@ -21,7 +21,7 @@ running = True
 
 # Load the model
 
-model = load_model(f'best_models/mobile_net_model_4096_05.keras')
+model = load_model(f'best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
 
 
 # Audio resource class
