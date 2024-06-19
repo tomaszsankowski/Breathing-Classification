@@ -110,18 +110,18 @@ def pygame_thread(audio):
             buffer += buffer
             #buffer = buffer + buffer[:len(buffer)//2]
 
-            wf = wave.open("../temp/temp.wav", 'wb')
+            wf = wave.open("temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(audio.p.get_sample_size(FORMAT))
             wf.setframerate(RATE)
             wf.writeframes(b''.join(buffer))
             wf.close()
-            audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
+            audio1, _ = load_audio("temp.wav", sr=df_state.sr())
             if noise_reduction_active:
-                audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
+                audio1, _ = load_audio("temp.wav", sr=df_state.sr())
                 enhanced = enhance(model, df_state, audio1, atten_lim_db=noise_reduction)
-                save_audio("../temp/temp.wav", enhanced, df_state.sr())
-            breathing_waveform = vggish_input.wavfile_to_examples("../temp/temp.wav")
+                save_audio("temp.wav", enhanced, df_state.sr())
+            breathing_waveform = vggish_input.wavfile_to_examples("temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
             postprocessed_batch = pproc.postprocess(embedding_batch)

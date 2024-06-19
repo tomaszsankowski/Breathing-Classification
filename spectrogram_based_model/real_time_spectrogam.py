@@ -8,8 +8,8 @@ import pandas as pd
 
 # Constants
 
-REFRESH_TIME = 0.25
-N_FOURIER = 2048
+REFRESH_TIME = 0.5
+N_FOURIER = 4096
 
 PREVIOUS_CLASS_BONUS = 0.2
 
