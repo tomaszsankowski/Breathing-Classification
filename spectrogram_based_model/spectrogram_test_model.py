@@ -10,7 +10,7 @@ SILENCE_PATH = 'spectrograms_large/silence_spectrograms'
 folder_paths = [INHALE_PATH, EXHALE_PATH, SILENCE_PATH]
 
 # Load the model
-model = load_model('models_mobilenet/mobile_net_model_4096_0.5_small.keras')
+model = load_model('models_mobilenet/mobile_net_model_4096_05.keras')
 
 # Load the data
 spectrograms = []
