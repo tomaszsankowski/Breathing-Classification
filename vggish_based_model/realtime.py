@@ -1,66 +1,47 @@
-import time
-import wave
-from concurrent.futures import ThreadPoolExecutor
-import random
-
-import joblib
-import pygame
-import pygame.freetype
-import pyaudio
-import matplotlib.animation as animation
-import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow.compat.v1 as tf
-import pygame_gui
-from tkinter import *
-import concurrent.futures
-
-from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
+from tensorflow.keras.models import load_model
+from scipy.signal import stft
+import pyaudio
+import matplotlib.pyplot as plt
+import time
 import pandas as pd
-from df.enhance import enhance, init_df, load_audio, save_audio
-import queue
+from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
 
-# ###########################################################################################
-# If there's an issue with the microphone, find the index of the microphone you want to use in the console,
-# along with its sampleRate. Then, change the variable RATE below and add the parameter
-# input_device_index=INDEX_OF_MICROPHONE
-# to
-# self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
-# ###########################################################################################
-AUDIO_CHUNK = 1024
-PLOT_CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 2
+# Constants
+
+REFRESH_TIME = 0.25
+N_FOURIER = 2048
+
+PREVIOUS_CLASS_BONUS = 0.2
+
+CHANNELS = 1
 RATE = 44100
-CHUNK_SIZE = int(RATE * 0.5) * 2
+DEVICE_INDEX = 4
 
-vggish_checkpoint_path = 'model/vggish_model.ckpt'
-CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
-VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
+running = True
 
-pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
-model, df_state, _ = init_df()
+# Load the model
 
-bonus = 1.15
-noise_reduction = 10
-noise_reduction_active = False
+model = load_model(f'best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
 
+
+# Audio resource class
 
 class SharedAudioResource:
     buffer = None
-    pred_aud_buffer = queue.Queue()
 
     def __init__(self):
         self.p = pyaudio.PyAudio()
+        self.buffer_size = int(RATE * REFRESH_TIME)
+        self.buffer = np.zeros(self.buffer_size, dtype=np.int16)
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
-        self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
-                                  frames_per_buffer=CHUNK_SIZE, input_device_index=4)
-        self.read(AUDIO_CHUNK)
+        self.stream = self.p.open(format=pyaudio.paInt16, channels=CHANNELS, rate=RATE, input=True,
+                                  frames_per_buffer=self.buffer_size, input_device_index=DEVICE_INDEX)
 
-    def read(self, size):
-        self.buffer = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
-        return self.buffer
+    def read(self):
+        self.buffer = self.stream.read(self.buffer_size, exception_on_overflow=False)
+        return np.frombuffer(self.buffer, dtype=np.int16)
 
     def close(self):
         self.stream.stop_stream()
@@ -68,247 +49,181 @@ class SharedAudioResource:
         self.p.terminate()
 
 
-def draw_text(text, pos, font, screen):
-    text_surface, _ = font.render(text, (255, 255, 255))
-    screen.blit(text_surface, (pos[0] - text_surface.get_width() // 2, pos[1] - text_surface.get_height() // 2))
+# Function to create a spectrogram from audio data:
+
+def create_spectrogram(frames):
+
+    # Calculate STFT parameters
+
+    furier_hop = np.floor(RATE * REFRESH_TIME / 224)
+    noverlap = N_FOURIER - furier_hop
+
+    # Perform FFT
+
+    stft_data = stft(frames, RATE, nperseg=N_FOURIER, noverlap=noverlap, scaling='spectrum')[2]
+
+    # Take only the first 224x224 part of the spectrogram
+
+    spectrogram_in = stft_data[:224, :224]
+
+    # Return spectrogram as matrix of positive values
+
+    return np.abs(spectrogram_in)
 
 
-def pygame_thread(audio):
-    pygame.init()
-    WIDTH, HEIGHT = 1366, 768
-    manager = pygame_gui.UIManager((WIDTH, HEIGHT))
-    FONT_SIZE = 24
-    TEXT_POS = (WIDTH // 2, HEIGHT // 2 - 200)
-    TEST_POS = (WIDTH // 2, HEIGHT // 2 - 300)
-    NOISE_POS = (WIDTH // 2, HEIGHT // 2 + 100)
+# Function to classify given spectrogram
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    font = pygame.freetype.SysFont(None, FONT_SIZE)
-    clock = pygame.time.Clock()
+def classify_realtime_audio(spectrogram_in):
+    global last_prediction
 
-    global bonus, noise_reduction, noise_reduction_active
+    # Prepare input for the model ( change dimensions )
 
-    running = True
-    rf_classifier = joblib.load(CLASS_MODEL_PATH)
-    with tf.Graph().as_default(), tf.Session() as sess:
-        # Define VGGish
-        embeddings = vggish_slim.define_vggish_slim()
+    spectrogram_in = np.expand_dims(spectrogram_in, axis=-1)
+    spectrogram_in = np.expand_dims(spectrogram_in, axis=0)
 
-        # Initialize all variables in the model, then load the VGGish checkpoint
-        sess.run(tf.global_variables_initializer())
-        vggish_slim.load_vggish_slim_checkpoint(sess, vggish_checkpoint_path)
+    # Model prefiction
 
-        # Get the input tensor
-        features_tensor = sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
-        while running:
-            time_delta = clock.tick(60) / 1000.0
-            start_time = time.time()
-            buffer = []
+    predictionon = model.predict(spectrogram_in, verbose=0)
 
-            buffer.append(audio.read(AUDIO_CHUNK))
+    # Add bonus for previous class
+    predictionon[0][last_prediction] += PREVIOUS_CLASS_BONUS
 
-            buffer += buffer
-            #buffer = buffer + buffer[:len(buffer)//2]
+    # Get new previous prediction
 
-            wf = wave.open("../temp/temp.wav", 'wb')
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(audio.p.get_sample_size(FORMAT))
-            wf.setframerate(RATE)
-            wf.writeframes(b''.join(buffer))
-            wf.close()
-            audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
-            if noise_reduction_active:
-                audio1, _ = load_audio("../temp/temp.wav", sr=df_state.sr())
-                enhanced = enhance(model, df_state, audio1, atten_lim_db=noise_reduction)
-                save_audio("../temp/temp.wav", enhanced, df_state.sr())
-            breathing_waveform = vggish_input.wavfile_to_examples("../temp/temp.wav")
+    last_prediction = np.argmax(predictionon)
 
-            embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: breathing_waveform}))
-            postprocessed_batch = pproc.postprocess(embedding_batch)
-            df = pd.DataFrame(postprocessed_batch)
+    # Print wages for every prediction
 
-            prediction = rf_classifier.predict(df)
-            audio.pred_aud_buffer.put((prediction[0], buffer))
+    print('Predicted class: ', np.array2string(np.round(predictionon, 4), suppress_small=True))
 
-            if prediction[0] == 0:
-                screen.fill(color="red")
-                draw_text(f"Inhale", TEXT_POS, font, screen)
-            elif prediction[0] == 1:
-                screen.fill(color="green")
-                draw_text(f"Exhale", TEXT_POS, font, screen)
-            else:
-                screen.fill(color="blue")
-                draw_text(f"Silence", TEXT_POS, font, screen)
-            draw_text("Press SPACE to stop", TEST_POS, font, screen)
+    # Return predicted class number
 
-            print(time.time() - start_time)
-            draw_text(f"Noise reduction: {noise_reduction}, active: {noise_reduction_active} ", NOISE_POS, font, screen)
-
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        print("Exiting")
-                        running = False
-
-                manager.process_events(event)
-            manager.update(time_delta)
-            manager.draw_ui(screen)
-            pygame.display.flip()
-            clock.tick(60)
-
-    pygame.quit()
+    return np.argmax(predictionon)
 
 
-plotdata = np.zeros((RATE * 2, 1))
-predictions = np.zeros((RATE * 2, 1))
-q = queue.Queue()
-ymin = -1500
-ymax = 1500
-fig, ax = plt.subplots(figsize=(8, 4))
-lines, = ax.plot(plotdata, color=(0, 1, 0.29))
-ax.set_facecolor((0, 0, 0))
-ax.set_ylim(ymin, ymax)
-xes = [i for i in range(RATE * 2)]
+# Plot variables
 
-fill_red = ax.fill_between(xes, ymin, ymax,
-                           where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
-                           color='red', alpha=0.3)
-fill_green = ax.fill_between(xes, ymin, ymax,
-                             where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
-                             color='green', alpha=0.3)
+PLOT_TIME_HISTORY = 5
+PLOT_CHUNK_SIZE = int(RATE*REFRESH_TIME)
 
-fill_yellow = ax.fill_between(xes, ymin, ymax,
-                              where=(
-                                  [True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                              color='blue', alpha=0.3)
+plotdata = np.zeros((RATE*PLOT_TIME_HISTORY, 1))
+x_linspace = np.arange(0, RATE*PLOT_TIME_HISTORY, 1)
+predictions = np.zeros((int(PLOT_TIME_HISTORY/REFRESH_TIME), 1))
+
+fig, ax = plt.subplots(figsize=(10, 5))
+
+ax.plot(plotdata, color='white')
 
 
-def update_plot(frame):
-    global plotdata, predictions, fill_red, fill_green, fill_yellow, xes
+# Key handler for plot window
 
-    if q.empty():
-        data = audio.pred_aud_buffer.get(block=True)
-        chunks = np.array_split(data[1], 2)
-        for chunk in chunks:
-            q.put((data[0], chunk))
-
-    queue_data = q.get()
-    frames = np.frombuffer(queue_data[1], dtype=np.int16)
-    frames = frames[::2]
-    shift = len(frames)
-
-    plotdata = np.roll(plotdata, -shift, axis=0)
-    plotdata[-shift:, 0] = frames
-
-    prediction = queue_data[0]
-    predictions = np.roll(predictions, -shift, axis=0)
-    pred_arr = [prediction for _ in range(shift)]
-    predictions[-shift:, 0] = pred_arr
-
-    lines.set_ydata(plotdata)
-
-    fill_red.remove()
-    fill_green.remove()
-    fill_yellow.remove()
-
-    fill_red = ax.fill_between(xes, ymin, ymax,
-                               where=([True if predictions[i][0] == 0 else False for i in range(len(predictions))]),
-                               color='red', alpha=0.3)
-    fill_green = ax.fill_between(xes, ymin, ymax,
-                                 where=([True if predictions[i][0] == 1 else False for i in range(len(predictions))]),
-                                 color='green', alpha=0.3)
-    fill_yellow = ax.fill_between(xes, ymin, ymax,
-                                  where=([True if predictions[i][0] == 2 else False for i in range(len(predictions))]),
-                                  color='blue', alpha=0.3)
-
-    return lines, fill_red, fill_green, fill_yellow
+def on_key(event):
+    global running
+    if event.key == ' ':
+        plt.close()
+        running = False
 
 
-def tkinker_sliders():
-    root = Tk()
-    root.title("Sliders")
-    root.geometry("600x400")
-    root.resizable(False, False)
+# Configuration of plot properties and other elements
 
-    def set_bonus(val):
-        global bonus
-        bonus = float(val)
+fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
+fig.suptitle('Press [SPACE] to stop. Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
 
-    def set_noise_reduction(val):
-        global noise_reduction
-        noise_reduction = float(val)
+ylim = (-500, 500)
+facecolor = (0, 0, 0)
 
-    bonus_label = Label(root, text="Bonus")
-    bonus_label.pack()
-
-    bonus_slider = Scale(root, from_=0.1, to=5, resolution=0.1, orient=HORIZONTAL, command=set_bonus)
-    bonus_slider.set(1.15)
-    bonus_slider.pack()
-
-    noise_reduction_label = Label(root, text="Noise reduction")
-    noise_reduction_label.pack()
-
-    noise_reduction_slider = Scale(root, from_=0, to=100, resolution=0.1, orient=HORIZONTAL,
-                                   command=set_noise_reduction)
-    noise_reduction_slider.set(10)
-    noise_reduction_slider.pack()
-
-    # add button to turn off noise reduction
-    def toggle_noise_reduction():
-        global noise_reduction_active
-        noise_reduction_active = not noise_reduction_active
-
-    noise_reduction_button = Button(root, text="Toggle noise reduction", command=toggle_noise_reduction)
-    noise_reduction_button.pack()
-
-    root.mainloop()
+ax.set_facecolor(facecolor)
+ax.set_ylim(ylim)
 
 
-x_len = 100  # Liczba punktów na osi x
-y_range1 = [0, 10]  # Zakres osi y dla pierwszego wykresu
-xdata1 = list(range(0, x_len))
-ydata1 = [0] * x_len
+# Moving avarage function
+
+def moving_average(data, window_size):
+    data_flatten = data.flatten()
+    ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
+    ma[:window_size-1] = data_flatten[:window_size-1]  # Leave the first window_size-1 elements unchanged
+    return ma.reshape(-1, 1)
 
 
-def update_loudness_data(ydata, y_range):
-    while (1):
-        ydata.append(random.randint(y_range[0], y_range[1]))
-        ydata.pop(0)
-        time.sleep(0.01)
+# Plot update function
+
+def update_plot(frames, prediction):
+    global plotdata, predictions, ax
+
+    # Roll signals and predictions vectors and insert new value at the end
+
+    plotdata = np.roll(plotdata, -len(frames))
+    plotdata[-len(frames):] = frames.reshape(-1, 1)
+
+    predictions = np.roll(predictions, -1)
+    predictions[-1] = prediction
+
+    # Moving avarage on plotdata (uncomment if needed)
+
+    plotdata = moving_average(plotdata, 50)
+
+    # Clean the plot and plot the new data
+
+    ax.clear()
+
+    for i in range(0, len(predictions)):
+        if predictions[i] == 0:  # Inhale
+            color = 'red'
+        elif predictions[i] == 1:  # Exhale
+            color = 'green'
+        else:  # Silence
+            color = 'blue'
+        ax.plot(x_linspace[PLOT_CHUNK_SIZE*i:PLOT_CHUNK_SIZE*(i+1)], plotdata[PLOT_CHUNK_SIZE*i:PLOT_CHUNK_SIZE*(i+1)], color=color)
+
+    # Set plot properties and show it
+
+    ax.set_facecolor(facecolor)
+    ax.set_ylim(ylim)
+
+    plt.draw()
+    plt.pause(0.01)
 
 
-def update_loudness_plot(frame, ydata, line):
-    line.set_ydata(ydata)
-    return line,
-
-
-fig1, ax1 = plt.subplots()
-line1, = ax1.plot(xdata1, ydata1, lw=2)
-ax1.set_ylim(y_range1)
-ax1.set_xlim([0, x_len - 1])
-ax1.set_xlabel('Czas')
-ax1.set_ylabel('Wartość')
-ax1.set_title('Wykres 1 w czasie rzeczywistym')
+# Main function
 
 if __name__ == "__main__":
+
+    # Initialize microphone
+
     audio = SharedAudioResource()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
-        future_pygame = executor.submit(pygame_thread, audio)
+    # Main loop
 
-        future_sliders = executor.submit(tkinker_sliders)
+    last_prediction = 2
+    while running:
 
-        ani = animation.FuncAnimation(fig, update_plot, frames=100, blit=True)
+        # Set timer to check how long each prediction takes
 
-        # TODO nie wiem czy to dziala na threadach
-        # future_pygame.result()
-        # future_sliders.result()
-        executor.submit(future_pygame.result)
-        executor.submit(future_sliders.result)
+        start_time = time.time()
 
-        executor.submit(update_loudness_data, ydata1, y_range1)
-        ani1 = animation.FuncAnimation(fig1, update_loudness_plot, fargs=(ydata1, line1), interval=100, blit=True)
+        # Collect samples
 
-        plt.show()
+        buffer = audio.read()
+
+        if buffer is None:
+            continue
+
+        # Create spectrogram
+
+        spectrogram = create_spectrogram(buffer)
+
+        # Make prediction
+
+        prediction = classify_realtime_audio(spectrogram)
+
+        # Update plot
+
+        update_plot(buffer, prediction)
+
+        # Print time needed for this loop iteration
+
+        print(time.time() - start_time)
+    # Close audio
 
     audio.close()

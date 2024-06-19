@@ -1,6 +1,6 @@
 numpy
 resampy
-tensorflow
+tensorflow==2.15.0
 tf_slim
 six
 soundfile
@@ -29,3 +29,4 @@ deepfilternet
 pygame_gui
 sounddevice
 pyshine
+keras==2.15.0
