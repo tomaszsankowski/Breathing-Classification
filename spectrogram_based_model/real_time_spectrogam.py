@@ -8,14 +8,14 @@ import pandas as pd
 
 # Constants
 
-REFRESH_TIME = 0.5
-N_FOURIER = 512
+REFRESH_TIME = 0.25
+N_FOURIER = 2048
 
 PREVIOUS_CLASS_BONUS = 0.2
 
 CHANNELS = 1
 RATE = 44100
-DEVICE_INDEX = 1
+DEVICE_INDEX = 4
 
 running = True
 

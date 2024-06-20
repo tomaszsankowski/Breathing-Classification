@@ -1,5 +1,4 @@
 import wave
-
 import numpy as np
 import pyaudio
 import matplotlib.pyplot as plt
@@ -11,7 +10,7 @@ import librosa
 
 # Constants
 
-REFRESH_TIME = 0.5
+REFRESH_TIME = 0.25
 N_FOURIER = 512
 
 FORMAT = pyaudio.paInt16
@@ -219,8 +218,7 @@ if __name__ == "__main__":
         prediction = classifier.predict('../temp/temp.wav')
 
         # Update plot
-
-        update_plot(buffer, prediction)
+        update_plot(buffer[::2], prediction)
 
         # Print time needed for this loop iteration
 

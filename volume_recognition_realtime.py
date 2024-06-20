@@ -7,7 +7,7 @@ import volume_recognition
 REFRESH_TIME = 0.15
 CHANNELS = 1
 RATE = 44100
-DEVICE_INDEX = 0
+DEVICE_INDEX = 4
 running = True
 VR = volume_recognition.Volume_Recognition()
 
