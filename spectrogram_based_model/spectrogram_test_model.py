@@ -1,3 +1,9 @@
+"""
+Old testing script.
+New one in analisys folder: analisys/spectrogram_analisys.py
+"""
+
+
 import os
 import numpy as np
 import tensorflow as tf
