@@ -4,20 +4,29 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
+import numpy as np
+import tensorflow as tf
 
-def result_analysis_nn(model, X_test, Y_test):
-  loss, accuracy = model.evaluate(X_test, Y_test)
-  print(f'Test loss: {loss}, Test accuracy: {accuracy}')
-  Y_test_predict_raw = model.predict(X_test)
-  Y_test_predict = [(prob.tolist()).index(max(prob.tolist())) for prob in Y_test_predict_raw]
-  Y_test_array = [(arr.tolist()).index(1) for arr in Y_test]
-  calculate_precision_and_recall(X_test, Y_test_array, Y_test_predict)
-  plot_precision_vs_recall(Y_test_array, Y_test_predict_raw, 3)
+
+def result_analysis_nn(raw_y_pred, Y_test):
+  #loss, accuracy = model.evaluate(X_test, Y_test)
+  #print(f'Test loss: {loss}, Test accuracy: {accuracy}')
+  Y_test_predict_raw = raw_y_pred#model.predict(X_test)
+
+  #Y_test_predict = [(prob.tolist()).index(max(prob.tolist())) for prob in Y_test_predict_raw]
+  Y_test_predict = [(prob).index(max(prob)) for prob in Y_test_predict_raw]
+  Y_test_array = [(arr).index(1) for arr in Y_test]
+
+  accuracy = calculate_accuracy(Y_test_array, Y_test_predict)
+  print(f'Test accuracy: {accuracy}')
+
+  calculate_precision_and_recall(Y_test_array, Y_test_predict)
+  plot_precision_vs_recall(Y_test_array, np.array(Y_test_predict_raw), 3)
   plt.show()
-  plot_roc(Y_test_array, Y_test_predict_raw, 3)
+  plot_roc(Y_test_array, np.array(Y_test_predict_raw), 3)
   plt.show()
 
-def calculate_precision_and_recall(x_test, y_test, y_pred):
+def calculate_precision_and_recall(y_test, y_pred):
     precisions, recalls, f1_scores = [],[],[]
     for i in range(3):
         precisions.append(precision_score(y_true=tf.equal(y_test, i), y_pred=tf.equal(y_pred,i)))
@@ -50,7 +59,7 @@ def plot_precision_vs_recall(Y_true, y_probas, classes_num):
     plt.clf()
     precisions, recalls, thresholds = [0,0,0],[0,0,0],[0,0,0]
     for i in range(classes_num):
-      y_scores = Y_probas[:, i]
+      y_scores = y_probas[:, i]
       precisions[i], recalls[i], thresholds[i] = precision_recall_curve(y_true=tf.equal(Y_true, i),
                                                                       probas_pred=y_scores)
       class_name = "inhale" if i == 0 else ("exhale" if i == 1 else "silence")
@@ -84,4 +93,38 @@ def plot_roc(Y_test, Y_probas, class_num):
   plt.ylabel("True positive rate")
   plt.title("ROC curve")
 
+def calculate_accuracy(Y_true, Y_pred):
+    right = 0;
+    for idc in range(len(Y_true)):
+        if(Y_true[idc] == Y_pred[idc]):
+            right+=1
+    return right/len(Y_true)
+
+
+confusion_matrix = [[75,31,0],[15,92,1],[15,2,140]]
+
+raw_prediction = []
+for i in range(3):
+    for j in range(3):
+        input = [0,0,0]
+        input[j] = 1
+        for k in range(confusion_matrix[i][j]):
+            raw_prediction.append(input)
+
+
+
+def start_analysis(predictions, confusion_matrix):
+    raw_res = []
+    for p in predictions:
+        raw_res.append(p[0].tolist())
+    #print(raw_res)
+
+    y_test = []
+    for i in range(3):
+        for j in range(3):
+            for k in range(int(confusion_matrix[i][j])):
+                input = [0, 0, 0]
+                input[i] = 1
+                y_test.append(input)
+    result_analysis_nn(raw_res, y_test)
 
