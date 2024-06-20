@@ -1,56 +1,38 @@
 import time
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 import os
-import numpy as np
 import librosa
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from model import AudioClassifier, AudioDatasetTrain as AudioDataset
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class AudioRNNClassifier(nn.Module):
-    def __init__(self):
-        super(AudioRNNClassifier, self).__init__()
-        self.lstm = nn.LSTM(input_size=20, hidden_size=256, num_layers=3, batch_first=True, dropout=0.2)
-        self.fc1 = nn.Linear(256, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 3)
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1)  # Swap the dimensions for LSTM (batch, seq, feature)
-        _, (hn, _) = self.lstm(x)
-        x = hn[-1]  # Take the last hidden state
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-class AudioDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        mfcc, label = self.data[idx]
-        return torch.tensor(mfcc).float(), torch.tensor(label).long()
+REFRESH_TIME = 0.25
+RATE = 48000
+CHUNK_SIZE = int(RATE * REFRESH_TIME)
+NUM_EPOCHS = 50
+PATIENCE_TIME = 10
+LEARNING_RATE = 0.001
+BATCH_SIZE = 32
 
 if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Device: ", device)
+
     total_time = time.time()
     start_time = time.time()
+
     print("Creating model...")
-    model = AudioRNNClassifier()
+    model = AudioClassifier()
     model = model.to(device)
     print("Model created, time: ", time.time() - start_time)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     exhale_dir = '../data/exhale'
@@ -61,22 +43,23 @@ if __name__ == '__main__':
     inhale_files = [os.path.join(inhale_dir, file) for file in os.listdir(inhale_dir)]
     silence_files = [os.path.join(silence_dir, file) for file in os.listdir(silence_dir)]
 
-    frame_length = 12000
-
     train_data = []
     files_list = [exhale_files, inhale_files, silence_files]
     files_names = ['exhale', 'inhale', 'silence']
+
     print("Loading data...")
     start_time = time.time()
+
     exhale_frames_size = 0
     inhale_frames_size = 0
     silence_frames_size = 0
+
     for label, files in enumerate(files_list):
         for file in files:
-            y, sr = librosa.load(file, sr=48000, mono=True)
-            for i in range(0, len(y), frame_length):
-                frame = y[i:i + frame_length]
-                if len(frame) == frame_length:  # Ignore the last frame if it's shorter
+            y, sr = librosa.load(file, sr=RATE, mono=True)
+            for i in range(0, len(y), CHUNK_SIZE):
+                frame = y[i:i + CHUNK_SIZE]
+                if len(frame) == CHUNK_SIZE:  # Ignore the last frame if it's shorter
                     mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                     train_data.append((mfcc, label))
 
@@ -97,25 +80,24 @@ if __name__ == '__main__':
     start_time = time.time()
     train_dataset = AudioDataset(train_data)
     val_dataset = AudioDataset(val_data)
-
     print("Datasets created, time: ", time.time() - start_time)
+
     print("Creating DataLoaders...")
     start_time = time.time()
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
     print("DataLoaders created, time: ", time.time() - start_time)
 
-    num_epochs = 50
     best_val_accuracy = 0.0
-    patience = 10
     early_stopping_counter = 0
+
     print("Training model...")
     start_time = time.time()
-    for epoch in range(num_epochs):
+    for epoch in range(NUM_EPOCHS):
         model.train()
         running_loss = 0.0
         running_accuracy = 0.0
-        progress_bar = tqdm(train_loader, desc=f'Epoch {epoch + 1}/{num_epochs}', unit='batch')
+        progress_bar = tqdm(train_loader, desc=f'Epoch {epoch + 1}/{NUM_EPOCHS}', unit='batch')
         for inputs, labels in progress_bar:
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -159,7 +141,7 @@ if __name__ == '__main__':
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
-            if early_stopping_counter >= patience:
+            if early_stopping_counter >= PATIENCE_TIME:
                 print("Early stopping triggered. No improvement in validation accuracy.")
                 break
 

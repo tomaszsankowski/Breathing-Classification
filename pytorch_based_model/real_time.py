@@ -6,38 +6,19 @@ from tkinter import *
 
 import librosa
 import numpy as np
+import pandas as pd
 import pyaudio
 import pygame
 import pygame.freetype
 import pygame_gui
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from df.enhance import init_df
-import pandas as pd
+import matplotlib as plt
 from torch.utils.data import Dataset
 
 from DeepFilterNet.DeepFilterNet.df import enhance
 from DeepFilterNet.DeepFilterNet.df.io import load_audio, save_audio
-
-
-class AudioClassifier(nn.Module):
-    def __init__(self):
-        super(AudioClassifier, self).__init__()
-        self.lstm = nn.LSTM(input_size=20, hidden_size=256, num_layers=3, batch_first=True, dropout=0.2)
-        self.fc1 = nn.Linear(256, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 3)
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1)  # Swap the dimensions for LSTM (batch, seq, feature)
-        _, (hn, _) = self.lstm(x)
-        x = hn[-1]  # Take the last hidden state
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
+from model import AudioClassifier, AudioDatasetRealtime as AudioDataset
 
 # ###########################################################################################
 # If there's an issue with the microphone, find the index of the microphone you want to use in the console,
@@ -48,10 +29,12 @@ class AudioClassifier(nn.Module):
 # ###########################################################################################
 AUDIO_CHUNK = 1024
 PLOT_CHUNK = 1024
+REFRESH_TIME = 0.25
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-CHUNK_SIZE = int(RATE * 0.25)
+CHUNK_SIZE = int(RATE * REFRESH_TIME)
+CLASSIFIER_MODEL_PATH = 'audio_rnn_classifier.pth'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model, df_state, _ = init_df()
@@ -60,16 +43,6 @@ bonus = 1.15
 noise_reduction = 10
 noise_reduction_active = False
 
-class AudioDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        mfcc = self.data[idx]
-        return torch.tensor(mfcc).float()
 
 class RealTimeAudioClassifier:
     def __init__(self, model_path):
@@ -80,13 +53,12 @@ class RealTimeAudioClassifier:
         self.last_prediction = None
 
     def predict(self, audio_path):
-        y, sr = librosa.load(audio_path, sr=48000, mono=True)
+        y, sr = librosa.load(audio_path, sr=RATE, mono=True)
 
-        frame_length = CHUNK_SIZE  # Długość ramki w próbkach
         frames = []
-        for i in range(0, len(y), frame_length):
-            frame = y[i:i + frame_length]
-            if len(frame) == frame_length:  # Ignorujemy ostatnią ramkę, jeśli jest krótsza
+        for i in range(0, len(y), CHUNK_SIZE):
+            frame = y[i:i + CHUNK_SIZE]
+            if len(frame) == CHUNK_SIZE:  # Ignorujemy ostatnią ramkę, jeśli jest krótsza
                 mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                 frames.append(mfcc)
 
@@ -94,7 +66,6 @@ class RealTimeAudioClassifier:
         frames = torch.utils.data.DataLoader(frames, batch_size=1, shuffle=False)
         for frames in frames:
             frames = frames.to(device)
-
 
         outputs = self.model(frames)
         global bonus
@@ -117,9 +88,9 @@ class SharedAudioResource:
             print(self.p.get_device_info_by_index(i))
         self.stream = self.p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True,
                                   frames_per_buffer=CHUNK_SIZE, input_device_index=1)
-        self.read(AUDIO_CHUNK)
+        self.read()
 
-    def read(self, size):
+    def read(self):
         self.buffer = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
         return self.buffer
 
@@ -148,13 +119,13 @@ def pygame_thread(audio):
     clock = pygame.time.Clock()
 
     running = True
-    classifier = RealTimeAudioClassifier('audio_rnn_classifier.pth')
+    classifier = RealTimeAudioClassifier(CLASSIFIER_MODEL_PATH)
     global bonus, noise_reduction, noise_reduction_active
     while running:
         time_delta = clock.tick(60) / 1000.0
         start_time = time.time()
         buffer = []
-        buffer.append(audio.read(AUDIO_CHUNK))
+        buffer.append(audio.read())
 
         start_time = time.time()
         wf = wave.open("../temp/temp.wav", 'wb')
@@ -243,11 +214,104 @@ def tkinker_sliders():
 
     root.mainloop()
 
+PLOT_TIME_HISTORY = 5
+PLOT_CHUNK_SIZE = int(RATE * REFRESH_TIME)
+plotdata = np.zeros((RATE * PLOT_TIME_HISTORY, 1))
+x_linspace = np.arange(0, RATE * PLOT_TIME_HISTORY, 1)
+predictions = np.zeros((int(PLOT_TIME_HISTORY / REFRESH_TIME), 1))
+def audio_plotter(audio):
+    print("Plotting audio")
+
+
+
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    ax.plot(plotdata, color='white')
+
+    # Key handler for plot window
+
+    def on_key(event):
+        global running
+        if event.key == ' ':
+            plt.close()
+            running = False
+
+    # Configuration of plot properties and other elements
+
+    fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
+    fig.suptitle('Press [SPACE] to stop. Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+    fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
+
+    ylim = (-500, 500)
+    facecolor = (0, 0, 0)
+
+    ax.set_facecolor(facecolor)
+    ax.set_ylim(ylim)
+
+    # Moving avarage function
+
+    def moving_average(data, window_size):
+        data_flatten = data.flatten()
+        ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
+        ma[:window_size - 1] = data_flatten[:window_size - 1]  # Leave the first window_size-1 elements unchanged
+        return ma.reshape(-1, 1)
+
+    # Plot update function
+
+    def update_plot(frames, prediction):
+        global plotdata, predictions, ax
+
+        # Roll signals and predictions vectors and insert new value at the end
+        frames = np.frombuffer(frames, dtype=np.int16)
+        plotdata = np.roll(plotdata, -len(frames))
+        plotdata[-len(frames):] = frames.reshape(-1, 1)
+
+        predictions = np.roll(predictions, -1)
+        predictions[-1] = prediction
+
+        # Moving avarage on plotdata (uncomment if needed)
+
+        plotdata = moving_average(plotdata, 50)
+
+        # Clean the plot and plot the new data
+
+        ax.clear()
+
+        for i in range(0, len(predictions)):
+            if predictions[i] == 0:  # Inhale
+                color = 'red'
+            elif predictions[i] == 1:  # Exhale
+                color = 'green'
+            else:  # Silence
+                color = 'blue'
+            ax.plot(x_linspace[PLOT_CHUNK_SIZE * i:PLOT_CHUNK_SIZE * (i + 1)],
+                    plotdata[PLOT_CHUNK_SIZE * i:PLOT_CHUNK_SIZE * (i + 1)], color=color)
+
+        # Set plot properties and show it
+
+        ax.set_facecolor(facecolor)
+        ax.set_ylim(ylim)
+
+        plt.draw()
+        plt.pause(0.01)
+
+    print("Start plotting")
+    while True:
+
+        prediction, frames = 0, audio.read()
+        print("Updating plot")
+        update_plot(frames, prediction)
 
 if __name__ == "__main__":
     audio = SharedAudioResource()
+
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
+    plot_thread_instance = threading.Thread(target=audio_plotter, args=(audio,))
+
     pygame_thread_instance.start()
+    plot_thread_instance.start()
     tkinker_sliders()
     pygame_thread_instance.join()
+    plot_thread_instance.join()
     audio.close()
