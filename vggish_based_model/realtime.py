@@ -1,28 +1,35 @@
 import numpy as np
-from tensorflow.keras.models import load_model
-from scipy.signal import stft
 import pyaudio
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
 from vggish_based_model.model import vggish_postprocess, vggish_params, vggish_slim, vggish_input
+from df.enhance import init_df, enhance, load_audio, save_audio
+import joblib
+import tensorflow.compat.v1 as tf
+import wave
 
 # Constants
 
-REFRESH_TIME = 0.25
-N_FOURIER = 2048
+DUPLICATE = 2  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
+REFRESH_TIME = 1/DUPLICATE
 
-PREVIOUS_CLASS_BONUS = 0.2
-
-CHANNELS = 1
+CHANNELS = 2
 RATE = 44100
 DEVICE_INDEX = 4
 
 running = True
 
-# Load the model
+# Load the models
 
-model = load_model(f'best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
+vggish_checkpoint_path = 'model/vggish_model.ckpt'
+CLASS_MODEL_PATH = 'model/trained_model_rf.pkl'
+VGGISH_PARAMS_PATH = 'model/vggish_pca_params.npz'
+
+pproc = vggish_postprocess.Postprocessor(VGGISH_PARAMS_PATH)
+model, df_state, _ = init_df()
+
+noise_reduction = 10  # Noise reduction in dB
 
 
 # Audio resource class
@@ -32,7 +39,7 @@ class SharedAudioResource:
 
     def __init__(self):
         self.p = pyaudio.PyAudio()
-        self.buffer_size = int(RATE * REFRESH_TIME)
+        self.buffer_size = int(RATE * REFRESH_TIME * CHANNELS)
         self.buffer = np.zeros(self.buffer_size, dtype=np.int16)
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
@@ -41,64 +48,12 @@ class SharedAudioResource:
 
     def read(self):
         self.buffer = self.stream.read(self.buffer_size, exception_on_overflow=False)
-        return np.frombuffer(self.buffer, dtype=np.int16)
+        return self.buffer
 
     def close(self):
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
-
-
-# Function to create a spectrogram from audio data:
-
-def create_spectrogram(frames):
-
-    # Calculate STFT parameters
-
-    furier_hop = np.floor(RATE * REFRESH_TIME / 224)
-    noverlap = N_FOURIER - furier_hop
-
-    # Perform FFT
-
-    stft_data = stft(frames, RATE, nperseg=N_FOURIER, noverlap=noverlap, scaling='spectrum')[2]
-
-    # Take only the first 224x224 part of the spectrogram
-
-    spectrogram_in = stft_data[:224, :224]
-
-    # Return spectrogram as matrix of positive values
-
-    return np.abs(spectrogram_in)
-
-
-# Function to classify given spectrogram
-
-def classify_realtime_audio(spectrogram_in):
-    global last_prediction
-
-    # Prepare input for the model ( change dimensions )
-
-    spectrogram_in = np.expand_dims(spectrogram_in, axis=-1)
-    spectrogram_in = np.expand_dims(spectrogram_in, axis=0)
-
-    # Model prefiction
-
-    predictionon = model.predict(spectrogram_in, verbose=0)
-
-    # Add bonus for previous class
-    predictionon[0][last_prediction] += PREVIOUS_CLASS_BONUS
-
-    # Get new previous prediction
-
-    last_prediction = np.argmax(predictionon)
-
-    # Print wages for every prediction
-
-    print('Predicted class: ', np.array2string(np.round(predictionon, 4), suppress_small=True))
-
-    # Return predicted class number
-
-    return np.argmax(predictionon)
 
 
 # Plot variables
@@ -193,37 +148,79 @@ if __name__ == "__main__":
 
     audio = SharedAudioResource()
 
-    # Main loop
+    # Initialize RandomForest
 
-    last_prediction = 2
-    while running:
+    rf_classifier = joblib.load(CLASS_MODEL_PATH)
 
-        # Set timer to check how long each prediction takes
+    with tf.Graph().as_default(), tf.Session() as sess:
+        # Define VGGish
 
-        start_time = time.time()
+        embeddings = vggish_slim.define_vggish_slim()
 
-        # Collect samples
+        # Initialize all variables in the model, then load the VGGish checkpoint
 
-        buffer = audio.read()
+        sess.run(tf.global_variables_initializer())
+        vggish_slim.load_vggish_slim_checkpoint(sess, vggish_checkpoint_path)
 
-        if buffer is None:
-            continue
+        # Get the input tensor
 
-        # Create spectrogram
+        features_tensor = sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
 
-        spectrogram = create_spectrogram(buffer)
+        # Main loop
 
-        # Make prediction
+        while running:
+            # Set timer to check how long each prediction takes
 
-        prediction = classify_realtime_audio(spectrogram)
+            start_time = time.time()
 
-        # Update plot
+            # Collect samples
 
-        update_plot(buffer, prediction)
+            bytes = audio.read()
 
-        # Print time needed for this loop iteration
+            print("XDDD", time.time() - start_time)
+            buffer = []
 
-        print(time.time() - start_time)
+            buffer.append(bytes)
+
+            # Duplicating samples, to extend recording to 1s (VGGish model needs 1 second of sound)
+
+            buffer += buffer
+
+            # Noice reduce
+
+            print(time.time() - start_time)
+            wf = wave.open("temp.wav", 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(audio.p.get_sample_size(pyaudio.paInt16))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(buffer))
+            wf.close()
+            audio1, _ = load_audio("temp.wav", sr=df_state.sr())
+
+            # VGGish feature extraction
+
+            print(time.time() - start_time)
+            input_batch = vggish_input.wavfile_to_examples("temp.wav")
+
+            embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: input_batch}))
+
+            postprocessed_batch = pproc.postprocess(embedding_batch)
+
+            df = pd.DataFrame(postprocessed_batch)  # 128 features vector
+
+            # Random Forest prediction from VGGish embeddings
+
+            prediction = rf_classifier.predict(df)
+
+            # Update plot
+
+            print(time.time() - start_time)
+            update_plot(np.frombuffer(bytes, dtype=np.int16), prediction[0])
+
+            # Print time needed for this loop iteration
+
+            print(time.time() - start_time)
+
     # Close audio
 
     audio.close()
