@@ -137,7 +137,7 @@ def df(spec: Tensor, coefs: Tensor) -> Tensor:
 
 
 def df_real(spec: Tensor, coefs: Tensor) -> Tensor:
-    """Deep filter implementation for real valued input Tensors. Requires unfolded spectrograms_small.
+    """Deep filter implementation for real valued input Tensors. Requires unfolded spectrograms.
 
     Args:
         spec (real-valued Tensor): Spectrogram of shape [B, C, N, T, F, 2].
