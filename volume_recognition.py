@@ -91,7 +91,7 @@ class Volume_Recognition:
         self.prev = new
         return new
 
-    def volume_update(self, frames, confirm):
+    def volume_update(self, frames):
         check_frames = abs(frames[::1])
 
         loud_frames = []
@@ -106,11 +106,11 @@ class Volume_Recognition:
         else:
             output = self.calc(0)
 
-        print(output)
-
+        return output
 
 
     def __init__(self):
+
         self.avg_exh, self.avg_inh, self.avg_sil = a()
         self.prev = 0
         self.prev_to_0 = 2
