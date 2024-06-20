@@ -48,7 +48,7 @@ facecolor = (0, 0, 0)
 
 # Configuration of plot properties and other elements
 fig.canvas.manager.set_window_title('Volume recognition')  # Title
-fig.suptitle('Red - Inhale, Green - Exhale, Blue - Silence\n press \'e\' to turn on impostor mode \n black background - not ready,  white background - ready,  yellow background - EXP mode')  # Instruction
+fig.suptitle('Red - Inhale, Green - Exhale, Blue - Silence\n press \'space\' to turn on impostor mode \n black background - not ready,  white background - ready,  yellow background - EXP mode')  # Instruction
 ylim = (0, 1000)
 
 ax.set_facecolor(facecolor)
