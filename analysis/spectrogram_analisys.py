@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from scipy.io import wavfile
 from scipy.signal import stft
-
+from result_analysis_neural_network import start_analysis
 '''
 Co robi program?
 Podajsz ścieżki do folderów z nagraniami wdechu, wydechu i ciszy
@@ -25,13 +25,13 @@ GLOBAL VARIABLES TO CHANGE TO TEST DIFFERENT SPECTROGRAM MODELS
 
 # Paths to inhale, exhale and silence audio files
 
-INHALE_DIR_PATH = '../spectrogram_based_model/train-data/inhale'
-EXHALE_DIR_PATH = '../spectrogram_based_model/train-data/exhale'
-SILENCE_DIR_PATH = '../spectrogram_based_model/train-data/silence'
+INHALE_DIR_PATH = './spectogram_test_data/inhale'
+EXHALE_DIR_PATH = './spectogram_test_data/exhale'
+SILENCE_DIR_PATH = './spectogram_test_data/silence'
 
 # Choosen model variables
 
-n_fourier = 2048  # Number of fourier points
+n_fourier = 512  # Number of fourier points
 segment_length = 0.5  # Length of audio file to be analyzed in seconds
 directory = '../spectrogram_based_model/best_models'  # Directory where the model is stored; alternatively: directory = 'models_mobilenet'
 
@@ -125,6 +125,7 @@ confusion_matrix = np.zeros((3, 3))
 
 # Iterate through every class and perform model prediction
 
+predictions = []
 for i, X_test in enumerate([X_test_inhale, X_test_exhale, X_test_silence]):
     for spectrogram in X_test:
         # Convert the spectrogram to numpy array
@@ -138,6 +139,8 @@ for i, X_test in enumerate([X_test_inhale, X_test_exhale, X_test_silence]):
         # Perform the prediction
 
         prediction = model.predict(spectrogram, verbose=0)
+        predictions.append(prediction)
+        #print(prediction.__class__)
 
         # Get the class index with the highest probability
 
@@ -154,3 +157,7 @@ print(f'\t\t\t\t\t\t\tInhale\t\t\tExhale\t\t\tSilence')
 print(f'Actual class\tInhale\t\t{confusion_matrix[0, 0]}\t\t\t\t{confusion_matrix[0, 1]}\t\t\t\t{confusion_matrix[0, 2]}')
 print(f'Actual class\tExhale\t\t{confusion_matrix[1, 0]}\t\t\t\t{confusion_matrix[1, 1]}\t\t\t\t{confusion_matrix[1, 2]}')
 print(f'Actual class\tSilence\t\t{confusion_matrix[2, 0]}\t\t\t\t{confusion_matrix[2, 1]}\t\t\t\t{confusion_matrix[2, 2]}')
+
+print(predictions)
+#print(predictions[1].__class__)
+start_analysis(predictions, confusion_matrix)
