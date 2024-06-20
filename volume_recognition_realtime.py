@@ -1,14 +1,13 @@
 import numpy as np
 import pyaudio
 import matplotlib.pyplot as plt
-import time
 import pandas as pd
 import volume_recognition
 
 REFRESH_TIME = 0.15
 CHANNELS = 1
 RATE = 44100
-DEVICE_INDEX = 5
+DEVICE_INDEX = 0
 running = True
 VR = volume_recognition.Volume_Recognition()
 
@@ -36,25 +35,21 @@ class SharedAudioResource:
         self.p.terminate()
 
 
-# Plot variables
 
+# Plot variables
 PLOT_TIME_HISTORY = 5
 PLOT_CHUNK_SIZE = int(RATE * REFRESH_TIME)
-
 plotdata = np.zeros((RATE * PLOT_TIME_HISTORY, 1))
 x_linspace = np.arange(0, RATE * PLOT_TIME_HISTORY, 1)
 predictions = np.zeros((int(PLOT_TIME_HISTORY / REFRESH_TIME), 1))
-
-fig, ax = plt.subplots(figsize=(10, 5))
-
+fig, ax = plt.subplots(figsize=(10, 8))
 ax.plot(plotdata, color='white')
+facecolor = (0, 0, 0)
 
 # Configuration of plot properties and other elements
-
 fig.canvas.manager.set_window_title('Volume recognition')  # Title
-
+fig.suptitle('Red - Inhale, Green - Exhale, Blue - Silence\n press \'e\' to turn on impostor mode \n black background - not ready,  white background - ready,  yellow background - EXP mode')  # Instruction
 ylim = (0, 1000)
-facecolor = (0, 0, 0)
 
 ax.set_facecolor(facecolor)
 ax.set_ylim(ylim)
@@ -101,17 +96,29 @@ def update_plot(frames, decisions):
     plt.pause(0.01)
 
 
+experimental = False
+calculated = False
+
+def on_key(event):
+    global experimental, facecolor
+    if calculated and event.key == ' ':
+        experimental = not experimental
+        if facecolor == (1, 1, 1):
+            facecolor = (0.98, 0.98, 0.59)
+        else:
+            facecolor = (1,1,1)
+
+fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
+
 # Main function
 
 if __name__ == "__main__":
 
     # Initialize microphone
     audio = SharedAudioResource()
-
     # Main loop
     decision_history = []
     noise = 0
-    calculated = False
 
     while running:
 
@@ -120,26 +127,39 @@ if __name__ == "__main__":
         buffer = abs(buffer)
 
         if calculated:
-            buffer = buffer - noise
+            buffer = buffer - (noise * 0.85)
 
         if buffer is None:
             continue
 
-        # Get the decision from volume recognition
-        volume_decision = VR.volume_update(buffer)
-
         # Add the decision to the history
-        decision_history.append(volume_decision)
-        print(decision_history)
-        #manually corrected
-        '''for i in range(len(decision_history) -1):
-            now = decision_history[i]
-            prev = decision_history[i-1]
-            next = decision_history[i+1]
-            if prev == next:
+        if not calculated:
+            decision_history.append(0)
+        else:
+            volume_decision = VR.volume_update(buffer)
+            decision_history.append(volume_decision)
+
+        # manually corrected
+        if calculated and experimental:
+            l = len(decision_history) - 1
+            left = decision_history[l - 2]
+            middle = decision_history[l - 1]
+            right = decision_history[l]
+            if left == 0 and left == right:
+                if middle != left:
+                    decision_history[l - 1] = 0
+                    VR.calc(0)
+                    VR.calc(1)
+                    print("\n# Impostor #\n")
+
+        '''for j in range(len(decision_history) - 1):
+            now = decision_history[j]
+            prev = decision_history[j-1]
+            nxt = decision_history[j+1]
+            if prev == nxt and prev == 0:
                 if now != prev:
-                    decision_history[i] = prev
-          '''
+                    decision_history[j] = prev
+                    VR.calc(1)'''
 
         # If history is longer than the number of segments we can display, remove the oldest decision
         if len(decision_history) > int(PLOT_TIME_HISTORY / REFRESH_TIME):
@@ -147,8 +167,8 @@ if __name__ == "__main__":
             if not calculated:
                 calculated = True
                 noise = np.mean(buffer)
+                facecolor = (1, 1, 1)
                 print("Done")
-
 
         # Update plot
         update_plot(buffer, decision_history)
