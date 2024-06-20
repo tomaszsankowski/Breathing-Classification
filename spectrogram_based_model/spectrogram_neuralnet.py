@@ -1,13 +1,5 @@
 """
-ACCURACY RESULTS:
-n = 4096, segment_length = 0.5, small dataset:
-n = 4096, segment_length = 0.5, big dataset:
-n = 2048, segment_length = 0.5, small dataset:
-n = 2048, segment_length = 0.5, big dataset:
-n = 1024, segment_length = 0.5, small dataset:
-n = 1024, segment_length = 0.5, big dataset:
-n = 512, segment_length = 0.5, small dataset:
-n = 512, segment_length = 0.5, big dataset:
+Run 'spectrogram_creator.py' first to generate the spectrograms.
 """
 
 import os

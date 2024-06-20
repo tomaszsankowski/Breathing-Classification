@@ -18,3 +18,4 @@ pandas
 tensorflow
 h5py
 loguru
+torch
