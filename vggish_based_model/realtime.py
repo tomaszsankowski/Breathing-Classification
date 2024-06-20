@@ -11,7 +11,7 @@ import wave
 
 # Constants
 
-DUPLICATE = 2  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
+DUPLICATE = 4  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
 REFRESH_TIME = 1/DUPLICATE
 
 CHANNELS = 2
@@ -215,7 +215,10 @@ if __name__ == "__main__":
             # Update plot
 
             print(time.time() - start_time)
-            update_plot(np.frombuffer(bytes, dtype=np.int16), prediction[0])
+
+            plot_frames = np.frombuffer(bytes, dtype=np.int16)
+
+            update_plot(plot_frames, prediction[0])
 
             # Print time needed for this loop iteration
 
