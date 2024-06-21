@@ -25,9 +25,9 @@ GLOBAL VARIABLES TO CHANGE TO TEST DIFFERENT SPECTROGRAM MODELS
 
 # Paths to inhale, exhale and silence audio files
 
-INHALE_DIR_PATH = './spectogram_test_data/inhale'
-EXHALE_DIR_PATH = './spectogram_test_data/exhale'
-SILENCE_DIR_PATH = './spectogram_test_data/silence'
+INHALE_DIR_PATH = './test_data/inhale'
+EXHALE_DIR_PATH = './test_data/exhale'
+SILENCE_DIR_PATH = './test_data/silence'
 
 # Choosen model variables
 
