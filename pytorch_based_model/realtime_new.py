@@ -15,6 +15,12 @@ N_FOURIER = 512
 
 FORMAT = pyaudio.paInt16
 
+INHALE_COUNTER = 0
+EXHALE_COUNTER = 0
+SAME_CLASS_IN_ROW_COUNTER = 0
+CLASSIFIES_IN_ROW_TO_COUNT = 2  # How many same classifies in row to count it as a real one
+PREVIOUS_CLASSIFIED_CLASS = 2  # 0 - Exhale, 1 - Inhale
+
 PREVIOUS_CLASS_BONUS = 0.2
 
 CHANNELS = 2
@@ -114,12 +120,16 @@ def on_key(event):
     if event.key == ' ':
         plt.close()
         running = False
+    elif event.key == 'r':
+        global INHALE_COUNTER, EXHALE_COUNTER
+        INHALE_COUNTER = 0
+        EXHALE_COUNTER = 0
 
 
 # Configuration of plot properties and other elements
 
-fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
-fig.suptitle('Press [SPACE] to stop. Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+fig.canvas.manager.set_window_title('Realtime Breath Detector ( Press [SPACE] to stop, [R] to reset counter )')  # Title
+fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
 
 ylim = (-500, 500)
@@ -174,6 +184,8 @@ def update_plot(frames, prediction):
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
 
+    fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+
     plt.draw()
     plt.pause(0.01)
 
@@ -216,6 +228,25 @@ if __name__ == "__main__":
         # Make prediction
 
         prediction = classifier.predict('../temp/temp.wav')
+
+        # Increase same class classififications in row
+
+        if prediction != PREVIOUS_CLASSIFIED_CLASS:
+            SAME_CLASS_IN_ROW_COUNTER = 0
+        else:
+            SAME_CLASS_IN_ROW_COUNTER += 1
+
+        # If we classified enough same classes in row, we can count it as a real one
+
+        if SAME_CLASS_IN_ROW_COUNTER == CLASSIFIES_IN_ROW_TO_COUNT:
+            if prediction == 0:
+                EXHALE_COUNTER += 1
+            elif prediction == 1:
+                INHALE_COUNTER += 1
+
+        # Update previous classified class
+
+        PREVIOUS_CLASSIFIED_CLASS = prediction
 
         # Update plot
         update_plot(buffer[::2], prediction)

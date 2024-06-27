@@ -11,8 +11,14 @@ import wave
 
 # Constants
 
-DUPLICATE = 4  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
+DUPLICATE = 2  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
 REFRESH_TIME = 1/DUPLICATE
+
+INHALE_COUNTER = 0
+EXHALE_COUNTER = 0
+SAME_CLASS_IN_ROW_COUNTER = 0
+CLASSIFIES_IN_ROW_TO_COUNT = 2  # How many same classifies in row to count it as a real one
+PREVIOUS_CLASSIFIED_CLASS = 2  # 0 - Inhale, 1 - Exhale
 
 CHANNELS = 2
 RATE = 44100
@@ -39,7 +45,7 @@ class SharedAudioResource:
 
     def __init__(self):
         self.p = pyaudio.PyAudio()
-        self.buffer_size = int(RATE * REFRESH_TIME * CHANNELS)
+        self.buffer_size = int(RATE * REFRESH_TIME)
         self.buffer = np.zeros(self.buffer_size, dtype=np.int16)
         for i in range(self.p.get_device_count()):
             print(self.p.get_device_info_by_index(i))
@@ -77,12 +83,16 @@ def on_key(event):
     if event.key == ' ':
         plt.close()
         running = False
+    elif event.key == 'r':
+        global INHALE_COUNTER, EXHALE_COUNTER
+        INHALE_COUNTER = 0
+        EXHALE_COUNTER = 0
 
 
 # Configuration of plot properties and other elements
 
-fig.canvas.manager.set_window_title('Realtime Breath Detector')  # Title
-fig.suptitle('Press [SPACE] to stop. Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+fig.canvas.manager.set_window_title('Realtime Breath Detector ( Press [SPACE] to stop, [R] to reset counter )')  # Title
+fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 fig.canvas.mpl_connect('key_press_event', on_key)  # Key handler
 
 ylim = (-500, 500)
@@ -135,6 +145,8 @@ def update_plot(frames, prediction):
 
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
+
+    fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 
     plt.draw()
     plt.pause(0.01)
@@ -212,13 +224,32 @@ if __name__ == "__main__":
 
             prediction = rf_classifier.predict(df)
 
+            # Increase same class classififications in row
+
+            if prediction != PREVIOUS_CLASSIFIED_CLASS:
+                SAME_CLASS_IN_ROW_COUNTER = 0
+            else:
+                SAME_CLASS_IN_ROW_COUNTER += 1
+
+            # If we classified enough same classes in row, we can count it as a real one
+
+            if SAME_CLASS_IN_ROW_COUNTER == CLASSIFIES_IN_ROW_TO_COUNT:
+                if prediction == 0:
+                    INHALE_COUNTER += 1
+                elif prediction == 1:
+                    EXHALE_COUNTER += 1
+
+            # Update previous classified class
+
+            PREVIOUS_CLASSIFIED_CLASS = prediction
+
             # Update plot
 
             print(time.time() - start_time)
 
             plot_frames = np.frombuffer(bytes, dtype=np.int16)
 
-            update_plot(plot_frames, prediction[0])
+            update_plot(plot_frames[::2], prediction[0])
 
             # Print time needed for this loop iteration
 
