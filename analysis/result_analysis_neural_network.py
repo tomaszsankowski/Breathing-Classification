@@ -124,7 +124,7 @@ def start_analysis(predictions, confusion_matrix):
         for j in range(3):
             for k in range(int(confusion_matrix[i][j])):
                 input = [0, 0, 0]
-                input[i] = 1
+                input[0 if i == 1 else 1 if i == 0 else 2] = 1
                 y_test.append(input)
     result_analysis_nn(raw_res, y_test)
 

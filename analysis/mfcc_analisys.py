@@ -1,6 +1,11 @@
 import os
 import numpy as np
+from result_analysis_neural_network import start_analysis
+
+import sys
+sys.path.append(os.getcwd() + '/..')
 from pytorch_based_model.model import AudioClassifier, AudioDatasetRealtime as AudioDataset
+
 from scipy.io import wavfile
 from scipy.signal import stft
 import torch
@@ -18,16 +23,16 @@ GLOBAL VARIABLES TO CHANGE TO TEST APPROACHES
 
 # Paths to inhale, exhale and silence audio files
 
-INHALE_DIR_PATH = '../spectrogram_based_model/train-data/inhale'
-EXHALE_DIR_PATH = '../spectrogram_based_model/train-data/exhale'
-SILENCE_DIR_PATH = '../spectrogram_based_model/train-data/silence'
+INHALE_DIR_PATH = 'test_data_mcff/inhale'
+EXHALE_DIR_PATH = 'test_data_mcff/exhale'
+SILENCE_DIR_PATH = 'test_data_mcff/silence'
 
 # Choosen model variables
 
 segment_length = 0.5  # Length of audio file to be analyzed in seconds
 sample_rate = 44100
 
-CLASSIFIER_MODEL_PATH = '../pytorch_based_model/audio_rnn_classifier.pth'  # I think only one is working
+CLASSIFIER_MODEL_PATH = '../pytorch_based_model/audio_rnn92_0_5s_classifier.pth'  # I think only one is working
 
 '''
 END OF GLOBAL VARIABLES
@@ -56,7 +61,7 @@ model.eval()
 # Columns represents predicted class
 
 confusion_matrix = np.zeros((3, 3))
-
+predictions = []
 # Iterate through the folders and read all the audio files
 for folder_path in folder_paths:
     for filename in os.listdir(folder_path):
@@ -92,6 +97,7 @@ for folder_path in folder_paths:
             # Predict the class of the segment
 
             outputs = model(frames)
+            predictions.append(outputs)
             _, predicted = torch.max(outputs, 1)
             prediction = predicted.cpu().numpy()[0]
 
@@ -121,3 +127,5 @@ print(
     f'Actual class\tExhale\t\t{confusion_matrix[1, 0]}\t\t\t\t{confusion_matrix[1, 1]}\t\t\t\t{confusion_matrix[1, 2]}')
 print(
     f'Actual class\tSilence\t\t{confusion_matrix[2, 0]}\t\t\t\t{confusion_matrix[2, 1]}\t\t\t\t{confusion_matrix[2, 2]}')
+
+start_analysis(predictions, confusion_matrix)
