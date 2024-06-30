@@ -8,7 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/spectrogram_based_model/spectrograms_small" />
       <excludeFolder url="file://$MODULE_DIR$/spectrogram_based_model/spectrograms_large" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.10 (Breathing-Classification)" jdkType="Python SDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">
