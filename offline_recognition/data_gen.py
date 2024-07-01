@@ -1,13 +1,10 @@
 import datetime
-import os
-
 import pandas as pd
 import pygame
 import pygame.freetype
 import time
 import pyaudio
 import numpy as np
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import threading
 import wave
@@ -21,19 +18,17 @@ import wave
 # to
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 # ###########################################################################################
-AUDIO_CHUNK = 1024
-PLOT_CHUNK = 1024
+AUDIO_CHUNK = 4096
+PLOT_CHUNK = 4096
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 48000
-INPUT_DEVICE_INDEX = 1
+RATE = 44100
+INPUT_DEVICE_INDEX = 4
 
 ##################################
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 
 WAV_PATH = ""
-
-
 
 
 class SharedAudioResource:
@@ -96,11 +91,11 @@ def pygame_thread(audio):
             wf.writeframes(b''.join(frames))
             wf.close()
 
-    start_time = None
+    start_time = 0.0
     filename = ""
-    w_pressed = False # inhale
-    e_pressed = False # exhale
-    r_pressed = False # silence
+    w_pressed = False  # inhale
+    e_pressed = False  # exhale
+    r_pressed = False  # silence
     running = True
     frames = []
     wf = None
@@ -113,6 +108,7 @@ def pygame_thread(audio):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_s:
                     if recording:
+                        tags.append(('I', time.time() - start_time))
                         save_audio()
                         df = pd.DataFrame(tags, columns=['tag', 'time'])
                         df.to_csv(WAV_PATH + filename + '.csv', index=False)
@@ -144,35 +140,23 @@ def pygame_thread(audio):
             draw_text("W:   TAG inhale    |   E:   TAG exhale", TEXT_POS, font, screen)
             draw_text("R:   TAG silence", TEXT_POS2, font, screen)
 
-
-
         pygame.display.flip()
         clock.tick(60)
 
     pygame.quit()
 
 
-def plot_audio(audio1):
+def plot_audio():
     x = np.arange(0, 2 * PLOT_CHUNK, 2)  # Przenieś tę linię do góry
 
-    def animate(i):
-        frames = audio1.buffer
-        data = np.frombuffer(frames, dtype=np.int16)
-        left_channel = data[::2]  # even index: left channel
-        right_channel = data[1::2]  # odd index: right channel
-        line1.set_ydata(left_channel)
-        line2.set_ydata(right_channel)
-        return line1, line2,
-
     fig, axs = plt.subplots(2)
-    line1, = axs[0].plot(x, np.random.rand(PLOT_CHUNK))
-    line2, = axs[1].plot(x, np.random.rand(PLOT_CHUNK))
+    axs[0].plot(x, np.random.rand(PLOT_CHUNK))
+    axs[1].plot(x, np.random.rand(PLOT_CHUNK))
 
     axs[0].set_ylim(-1500, 1500)
     axs[0].set_xlim(0, PLOT_CHUNK / 2)
     axs[1].set_ylim(-1500, 1500)
     axs[1].set_xlim(0, PLOT_CHUNK / 2)
-    ani = animation.FuncAnimation(fig, animate, frames=100, blit=True)
     plt.show()
 
 
@@ -180,6 +164,6 @@ if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    plot_audio(audio)
+    plot_audio()
     pygame_thread_instance.join()
     audio.close()
