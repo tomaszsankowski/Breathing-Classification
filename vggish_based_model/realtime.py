@@ -22,7 +22,7 @@ PREVIOUS_CLASSIFIED_CLASS = 2  # 0 - Inhale, 1 - Exhale
 
 CHANNELS = 2
 RATE = 44100
-DEVICE_INDEX = 4
+DEVICE_INDEX = 5
 
 running = True
 

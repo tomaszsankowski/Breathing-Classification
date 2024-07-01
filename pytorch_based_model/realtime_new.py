@@ -7,6 +7,7 @@ import pandas as pd
 from model import AudioClassifier, AudioDatasetRealtime as AudioDataset
 import torch
 import librosa
+import subprocess
 
 # Constants
 
@@ -24,8 +25,8 @@ PREVIOUS_CLASSIFIED_CLASS = 2  # 0 - Exhale, 1 - Inhale
 PREVIOUS_CLASS_BONUS = 0.2
 
 CHANNELS = 2
-RATE = 48000
-DEVICE_INDEX = 1
+RATE = 44100
+DEVICE_INDEX = 4
 
 CHUNK_SIZE = int(RATE * REFRESH_TIME)
 
@@ -91,9 +92,9 @@ class RealTimeAudioClassifier:
         outputs = self.model(frames)
         global bonus
         if self.last_prediction is not None:
-            print("Before bonus", outputs)
+            #  print("Before bonus", outputs)
             outputs[0][self.last_prediction] *= bonus
-            print("After bonus", outputs)
+            #  print("After bonus", outputs)
         _, predicted = torch.max(outputs, 1)
         self.last_prediction = predicted.cpu().numpy()[0]
         return predicted.cpu().numpy()
@@ -150,7 +151,7 @@ def moving_average(data, window_size):
 
 # Plot update function
 
-def update_plot(frames, prediction):
+def update_plot(frames, prediction, is_calibrating):
     global plotdata, predictions, ax
 
     # Roll signals and predictions vectors and insert new value at the end
@@ -163,7 +164,7 @@ def update_plot(frames, prediction):
 
     # Moving avarage on plotdata (uncomment if needed)
 
-    plotdata = moving_average(plotdata, 50)
+    # plotdata = moving_average(plotdata, 50)
 
     # Clean the plot and plot the new data
 
@@ -184,10 +185,21 @@ def update_plot(frames, prediction):
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
 
-    fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+    if is_calibrating:
+        fig.suptitle(f'Dont breathe! Calibrating microphone...')  # Instruction
+    else:
+        fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 
     plt.draw()
     plt.pause(0.01)
+
+
+def set_microphone_volume(volume):
+    #  Decrease microphone volume by 5%
+
+    command = ["amixer", "-c", "1", "cset", "numid=4", f"{volume}%"]
+
+    subprocess.run(command)
 
 
 # Main function
@@ -199,6 +211,55 @@ if __name__ == "__main__":
     audio = SharedAudioResource()
 
     classifier = RealTimeAudioClassifier(CLASSIFIER_MODEL_PATH)
+
+    """
+    # Microphone calibration
+
+    VOLUME = 100  # Starting at max volume
+
+    # Set microphone volume to max
+
+    set_microphone_volume(VOLUME)
+
+    # Calibrate microphone
+
+    silences_in_row = 0
+
+    # Decrease volume untill we get 5 silences in a row
+
+    while silences_in_row < 5 and running:
+
+        # Read audio
+
+        buffer = audio.read()
+
+        if buffer is None:
+            continue
+
+        # Create wav file to store frames
+
+        wf = wave.open("../temp/temp.wav", 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(audio.p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(b''.join(buffer))
+        wf.close()
+
+        # Make prediction
+
+        prediction = classifier.predict('../temp/temp.wav')
+
+        # Update plot with is_calibrating flag on
+
+        update_plot(buffer[::2], prediction, True)
+
+        if prediction == 2:
+            silences_in_row += 1
+        else:
+            silences_in_row = 0
+            VOLUME -= 5
+            set_microphone_volume(VOLUME)
+    """
 
     # Main loop
 
@@ -249,7 +310,7 @@ if __name__ == "__main__":
         PREVIOUS_CLASSIFIED_CLASS = prediction
 
         # Update plot
-        update_plot(buffer[::2], prediction)
+        update_plot(buffer[::2], prediction, False)
 
         # Print time needed for this loop iteration
 
