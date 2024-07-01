@@ -33,8 +33,7 @@ CHUNK_SIZE = int(RATE * REFRESH_TIME)
 running = True
 bonus = 1.15
 
-# Model path
-
+filename = '2024-07-01_17-58-58'
 CLASSIFIER_MODEL_PATH = '../pytorch_based_model/audio_rnn_classifier.pth'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -58,7 +57,7 @@ class RealTimeAudioClassifier:
             frames = []
             for i in range(0, len(y), CHUNK_SIZE):
                 frame = y[i:i + CHUNK_SIZE]
-                if len(frame) == CHUNK_SIZE:  # Ignorujemy ostatnią ramkę, jeśli jest krótsza
+                if len(frame) == CHUNK_SIZE:
                     mfcc = librosa.feature.mfcc(y=frame, sr=sr)
                     frames.append(mfcc)
 
@@ -80,27 +79,21 @@ class RealTimeAudioClassifier:
 
 
 if __name__ == "__main__":
-    filename = '2024-07-01_17-58-58'
     prediction_path = f'{filename}.wav'
     tags_path = f'{filename}.csv'
 
-    tags = pd.read_csv(tags_path)
-    tags, time = tags['tag'], tags['time']
-    # convert tags and time to array
-    tags = tags.to_numpy()
-    tag_time = time.to_numpy()
+    tags = pd.read_csv(tags_path)['tag'].to_numpy()
+    tag_time = pd.read_csv(tags_path)['time'].to_numpy()
 
     wf = wave.open(prediction_path, 'rb')
     classifier = RealTimeAudioClassifier(CLASSIFIER_MODEL_PATH)
     predictions = classifier.predict(prediction_path)
-    # Wczytanie danych z pliku wav
+
     signal = wf.readframes(-1)
     signal = np.frombuffer(signal, dtype='int16')
 
-    # Tworzenie osi czasu
     time = np.linspace(0, len(signal) / wf.getframerate(), num=len(signal))
 
-    # Tworzenie wykresu
     fig, axs = plt.subplots(2, 1)  # 2 rows, 1 column
 
     for i in range(len(predictions)):
@@ -133,6 +126,6 @@ if __name__ == "__main__":
     axs[1].set_ylabel('Amplitude')
     axs[1].set_title('Waveform of the audio file [TAG]')
 
-    plt.tight_layout()  # Adjusts subplot params so that subplots fit into the figure area
+    plt.tight_layout()
 
     plt.show()
