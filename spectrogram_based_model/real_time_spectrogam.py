@@ -5,8 +5,39 @@ import pyaudio
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
+import subprocess
+
+"""
+
+INSTRUCTION
+
+Firtly start the program. In console it will write all possible input devices. Change 
+DEVICE_INDEX constant to the microphone's index that you want to use. You can also change sample rate constant,
+but it is advisable to leave it as it is (44100 Hz). Then close program (press spacebar) and run it again 
+with changed constants.
+
+If you don't want to calibrate microphone, you want to do this manually or you are
+using microphone plugged to USB port you can set CALIBRATE_MICROPHONE to False.
+
+Calibration works only for input devices connected to minijack port or built-in in laptop.
+Program will calibrate device that is set as 'sysdefault'
+
+Before starting program, please set your microphone volume to max manually and don't breathe
+untill message on program window stop showing 'Dont breathe! Calibrating microphone...'.
+
+If program will classify silence as other classes it is probably because microphone sensitivity is not
+set correctly. Try running program again to calibrate it again or try to adjust sensitivity manually.
+
+You can press 'r' to reset inhale and exhale counters.
+
+Have fun!
+
+"""
 
 # Constants
+
+CALIBRATE_MICROPHONE = True
+SILENCES_IN_ROW_TO_END_CALIBRATION = 5
 
 REFRESH_TIME = 0.25
 N_FOURIER = 2048
@@ -45,6 +76,7 @@ class SharedAudioResource:
                                   frames_per_buffer=self.buffer_size, input_device_index=DEVICE_INDEX)
 
     def read(self):
+
         self.buffer = self.stream.read(self.buffer_size, exception_on_overflow=False)
         return np.frombuffer(self.buffer, dtype=np.int16)
 
@@ -146,18 +178,9 @@ ax.set_facecolor(facecolor)
 ax.set_ylim(ylim)
 
 
-# Moving avarage function
-
-def moving_average(data, window_size):
-    data_flatten = data.flatten()
-    ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
-    ma[:window_size-1] = data_flatten[:window_size-1]  # Leave the first window_size-1 elements unchanged
-    return ma.reshape(-1, 1)
-
-
 # Plot update function
 
-def update_plot(frames, prediction):
+def update_plot(frames, prediction, is_calibrating=False):
     global plotdata, predictions, ax
 
     # Roll signals and predictions vectors and insert new value at the end
@@ -167,10 +190,6 @@ def update_plot(frames, prediction):
 
     predictions = np.roll(predictions, -1)
     predictions[-1] = prediction
-
-    # Moving avarage on plotdata (uncomment if needed)
-
-    plotdata = moving_average(plotdata, 50)
 
     # Clean the plot and plot the new data
 
@@ -190,7 +209,10 @@ def update_plot(frames, prediction):
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
 
-    fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+    if is_calibrating:
+        fig.suptitle(f'Dont breathe! Calibrating microphone...')  # Instruction
+    else:
+        fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 
     plt.draw()
     plt.pause(0.01)
@@ -198,15 +220,52 @@ def update_plot(frames, prediction):
 
 # Main function
 
+last_prediction = 2
 if __name__ == "__main__":
 
     # Initialize microphone
 
     audio = SharedAudioResource()
 
+    if CALIBRATE_MICROPHONE:
+        # Microphone calibration
+
+        silences_in_row = 0
+
+        # Decrease volume untill we get 5 silences in a row
+
+        while silences_in_row < SILENCES_IN_ROW_TO_END_CALIBRATION and running:
+
+            # Read audio
+
+            buffer = audio.read()
+
+            if buffer is None:
+                continue
+
+            # Create spectrogram
+
+            spectrogram = create_spectrogram(buffer)
+
+            # Make prediction
+
+            prediction = classify_realtime_audio(spectrogram)
+
+            # Update plot with is_calibrating flag on
+
+            update_plot(buffer[::2], prediction, True)
+
+            if prediction == 2:
+                silences_in_row += 1
+            else:
+                silences_in_row = 0
+
+                # Decrease microphone volume by 5%
+
+                subprocess.run(["amixer", "sset", "Capture", "5%-"])
+
     # Main loop
 
-    last_prediction = 2
     while running:
 
         # Set timer to check how long each prediction takes
@@ -249,7 +308,7 @@ if __name__ == "__main__":
 
         # Update plot
 
-        update_plot(buffer, prediction)
+        update_plot(buffer, prediction, False)
 
         # Print time needed for this loop iteration
 

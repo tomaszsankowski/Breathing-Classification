@@ -3,16 +3,44 @@ import numpy as np
 import pyaudio
 import matplotlib.pyplot as plt
 import time
-import pandas as pd
 from model import AudioClassifier, AudioDatasetRealtime as AudioDataset
 import torch
 import librosa
 import subprocess
 
+"""
+
+INSTRUCTION
+
+Firtly start the program. In console it will write all possible input devices. Change 
+DEVICE_INDEX constant to the microphone's index that you want to use. You can also change sample rate constant,
+but it is advisable to leave it as it is (44100 Hz). Then close program (press spacebar) and run it again 
+with changed constants.
+
+If you don't want to calibrate microphone, you want to do this manually or you are
+using microphone plugged to USB port you can set CALIBRATE_MICROPHONE to False.
+
+Calibration works only for input devices connected to minijack port or built-in in laptop.
+Program will calibrate device that is set as 'sysdefault'
+
+Before starting program, please set your microphone volume to max manually and don't breathe
+untill message on program window stop showing 'Dont breathe! Calibrating microphone...'.
+
+If program will classify silence as other classes it is probably because microphone sensitivity is not
+set correctly. Try running program again to calibrate it again or try to adjust sensitivity manually.
+
+You can press 'r' to reset inhale and exhale counters.
+
+Have fun!
+
+"""
+
 # Constants
 
+CALIBRATE_MICROPHONE = True
+SILENCES_IN_ROW_TO_END_CALIBRATION = 10
+
 REFRESH_TIME = 0.25
-N_FOURIER = 512
 
 FORMAT = pyaudio.paInt16
 
@@ -140,18 +168,9 @@ ax.set_facecolor(facecolor)
 ax.set_ylim(ylim)
 
 
-# Moving avarage function
-
-def moving_average(data, window_size):
-    data_flatten = data.flatten()
-    ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
-    ma[:window_size - 1] = data_flatten[:window_size - 1]  # Leave the first window_size-1 elements unchanged
-    return ma.reshape(-1, 1)
-
-
 # Plot update function
 
-def update_plot(frames, prediction, is_calibrating):
+def update_plot(frames, prediction, is_calibrating=False):
     global plotdata, predictions, ax
 
     # Roll signals and predictions vectors and insert new value at the end
@@ -161,10 +180,6 @@ def update_plot(frames, prediction, is_calibrating):
 
     predictions = np.roll(predictions, -1)
     predictions[-1] = prediction
-
-    # Moving avarage on plotdata (uncomment if needed)
-
-    # plotdata = moving_average(plotdata, 50)
 
     # Clean the plot and plot the new data
 
@@ -194,14 +209,6 @@ def update_plot(frames, prediction, is_calibrating):
     plt.pause(0.01)
 
 
-def set_microphone_volume(volume):
-    #  Decrease microphone volume by 5%
-
-    command = ["amixer", "-c", "1", "cset", "numid=4", f"{volume}%"]
-
-    subprocess.run(command)
-
-
 # Main function
 
 if __name__ == "__main__":
@@ -212,54 +219,47 @@ if __name__ == "__main__":
 
     classifier = RealTimeAudioClassifier(CLASSIFIER_MODEL_PATH)
 
-    """
-    # Microphone calibration
+    if CALIBRATE_MICROPHONE:
+        # Microphone calibration
 
-    VOLUME = 100  # Starting at max volume
+        silences_in_row = 0
 
-    # Set microphone volume to max
+        # Decrease volume untill we get 5 silences in a row
 
-    set_microphone_volume(VOLUME)
+        while silences_in_row < SILENCES_IN_ROW_TO_END_CALIBRATION and running:
 
-    # Calibrate microphone
+            # Read audio
 
-    silences_in_row = 0
+            buffer = audio.read()
 
-    # Decrease volume untill we get 5 silences in a row
+            if buffer is None:
+                continue
 
-    while silences_in_row < 5 and running:
+            # Create wav file to store frames
 
-        # Read audio
+            wf = wave.open("../temp/temp.wav", 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(audio.p.get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(buffer))
+            wf.close()
 
-        buffer = audio.read()
+            # Make prediction
 
-        if buffer is None:
-            continue
+            prediction = classifier.predict('../temp/temp.wav')
 
-        # Create wav file to store frames
+            # Update plot with is_calibrating flag on
 
-        wf = wave.open("../temp/temp.wav", 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(audio.p.get_sample_size(FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(buffer))
-        wf.close()
+            update_plot(buffer[::2], prediction, True)
 
-        # Make prediction
+            if prediction == 2:
+                silences_in_row += 1
+            else:
+                silences_in_row = 0
 
-        prediction = classifier.predict('../temp/temp.wav')
+                # Decrease microphone volume by 5%
 
-        # Update plot with is_calibrating flag on
-
-        update_plot(buffer[::2], prediction, True)
-
-        if prediction == 2:
-            silences_in_row += 1
-        else:
-            silences_in_row = 0
-            VOLUME -= 5
-            set_microphone_volume(VOLUME)
-    """
+                subprocess.run(["amixer", "sset", "Capture", "5%-"])
 
     # Main loop
 

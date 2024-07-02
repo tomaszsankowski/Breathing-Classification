@@ -8,10 +8,41 @@ from df.enhance import init_df, enhance, load_audio, save_audio
 import joblib
 import tensorflow.compat.v1 as tf
 import wave
+import subprocess
+
+"""
+
+INSTRUCTION
+
+Firtly start the program. In console it will write all possible input devices. Change 
+DEVICE_INDEX constant to the microphone's index that you want to use. You can also change sample rate constant,
+but it is advisable to leave it as it is (44100 Hz). Then close program (press spacebar) and run it again 
+with changed constants.
+
+If you don't want to calibrate microphone, you want to do this manually or you are
+using microphone plugged to USB port you can set CALIBRATE_MICROPHONE to False.
+
+Calibration works only for input devices connected to minijack port or built-in in laptop.
+Program will calibrate device that is set as 'sysdefault'
+
+Before starting program, please set your microphone volume to max manually and don't breathe
+untill message on program window stop showing 'Dont breathe! Calibrating microphone...'.
+
+If program will classify silence as other classes it is probably because microphone sensitivity is not
+set correctly. Try running program again to calibrate it again or try to adjust sensitivity manually.
+
+You can press 'r' to reset inhale and exhale counters.
+
+Have fun!
+
+"""
 
 # Constants
 
-DUPLICATE = 2  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
+CALIBRATE_MICROPHONE = True
+SILENCES_IN_ROW_TO_END_CALIBRATION = 5
+
+DUPLICATE = 4  # 1 = 1s refresh time, 2 = 0.5s refresh time, 4 = 0.25 refresh time, etc.
 REFRESH_TIME = 1/DUPLICATE
 
 INHALE_COUNTER = 0
@@ -21,8 +52,8 @@ CLASSIFIES_IN_ROW_TO_COUNT = 2  # How many same classifies in row to count it as
 PREVIOUS_CLASSIFIED_CLASS = 2  # 0 - Inhale, 1 - Exhale
 
 CHANNELS = 2
-RATE = 44100
-DEVICE_INDEX = 5
+RATE = 48000
+DEVICE_INDEX = 4
 
 running = True
 
@@ -102,18 +133,9 @@ ax.set_facecolor(facecolor)
 ax.set_ylim(ylim)
 
 
-# Moving avarage function
-
-def moving_average(data, window_size):
-    data_flatten = data.flatten()
-    ma = pd.Series(data_flatten).rolling(window=window_size).mean().to_numpy()
-    ma[:window_size-1] = data_flatten[:window_size-1]  # Leave the first window_size-1 elements unchanged
-    return ma.reshape(-1, 1)
-
-
 # Plot update function
 
-def update_plot(frames, prediction):
+def update_plot(frames, prediction, is_calibrating=False):
     global plotdata, predictions, ax
 
     # Roll signals and predictions vectors and insert new value at the end
@@ -123,10 +145,6 @@ def update_plot(frames, prediction):
 
     predictions = np.roll(predictions, -1)
     predictions[-1] = prediction
-
-    # Moving avarage on plotdata (uncomment if needed)
-
-    plotdata = moving_average(plotdata, 50)
 
     # Clean the plot and plot the new data
 
@@ -146,7 +164,11 @@ def update_plot(frames, prediction):
     ax.set_facecolor(facecolor)
     ax.set_ylim(ylim)
 
-    fig.suptitle(f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
+    if is_calibrating:
+        fig.suptitle(f'Dont breathe! Calibrating microphone...')  # Instruction
+    else:
+        fig.suptitle(
+            f'Inhales: {INHALE_COUNTER}  Exhales: {EXHALE_COUNTER}        Colours meaning: Red - Inhale, Green - Exhale, Blue - Silence')  # Instruction
 
     plt.draw()
     plt.pause(0.01)
@@ -178,6 +200,66 @@ if __name__ == "__main__":
 
         features_tensor = sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
 
+        if CALIBRATE_MICROPHONE:
+            # Microphone calibration
+
+            silences_in_row = 0
+
+            # Decrease volume untill we get 5 silences in a row
+
+            while silences_in_row < SILENCES_IN_ROW_TO_END_CALIBRATION and running:
+
+                # Read audio
+
+                frames = audio.read()
+
+                if frames is None:
+                    continue
+
+                # Duplicating samples, to extend recording to 1s (VGGish model needs 1 second of sound)
+
+                buffer = [frames]
+
+                for i in range(DUPLICATE-1):
+                    buffer.append(frames)
+
+                # Create wav file for VGGish
+
+                wf = wave.open("temp.wav", 'wb')
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(audio.p.get_sample_size(pyaudio.paInt16))
+                wf.setframerate(RATE)
+                wf.writeframes(b''.join(buffer))
+                wf.close()
+                audio1, _ = load_audio("temp.wav", sr=df_state.sr())
+
+                # VGGish feature extraction
+
+                input_batch = vggish_input.wavfile_to_examples("temp.wav")
+
+                embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: input_batch}))
+
+                postprocessed_batch = pproc.postprocess(embedding_batch)
+
+                df = pd.DataFrame(postprocessed_batch)  # 128 features vector
+
+                # Random Forest prediction from VGGish embeddings
+
+                prediction = rf_classifier.predict(df)
+
+                # Update plot with is_calibrating flag on
+
+                update_plot((np.frombuffer(frames, dtype=np.int16))[::2], prediction, True)
+
+                if prediction == 2:
+                    silences_in_row += 1
+                else:
+                    silences_in_row = 0
+
+                    # Decrease microphone volume by 5%
+
+                    subprocess.run(["amixer", "sset", "Capture", "5%-"])
+
         # Main loop
 
         while running:
@@ -187,20 +269,17 @@ if __name__ == "__main__":
 
             # Collect samples
 
-            bytes = audio.read()
-
-            print("XDDD", time.time() - start_time)
-            buffer = []
-
-            buffer.append(bytes)
+            frames = audio.read()
 
             # Duplicating samples, to extend recording to 1s (VGGish model needs 1 second of sound)
 
-            buffer += buffer
+            buffer = [frames]
+
+            for i in range(DUPLICATE - 1):
+                buffer.append(frames)
 
             # Noice reduce
 
-            print(time.time() - start_time)
             wf = wave.open("temp.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(audio.p.get_sample_size(pyaudio.paInt16))
@@ -211,7 +290,6 @@ if __name__ == "__main__":
 
             # VGGish feature extraction
 
-            print(time.time() - start_time)
             input_batch = vggish_input.wavfile_to_examples("temp.wav")
 
             embedding_batch = np.array(sess.run(embeddings, feed_dict={features_tensor: input_batch}))
@@ -245,11 +323,9 @@ if __name__ == "__main__":
 
             # Update plot
 
-            print(time.time() - start_time)
+            plot_frames = np.frombuffer(frames, dtype=np.int16)
 
-            plot_frames = np.frombuffer(bytes, dtype=np.int16)
-
-            update_plot(plot_frames[::2], prediction[0])
+            update_plot(plot_frames[::2], prediction[0], False)
 
             # Print time needed for this loop iteration
 

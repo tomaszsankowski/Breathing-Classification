@@ -38,9 +38,12 @@ running = True
 filename = '2024-07-02_01-08-40'
 CLASSIFIER_MODEL_PATH = '../pytorch_based_model/audio_rnn_classifier.pth'
 
-model_spectrogams = load_model(f'../spectrogram_based_model/best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
+model_spectrogams = load_model(
+    f'../spectrogram_based_model/best_models/mobile_net_model_{N_FOURIER}_{REFRESH_TIME}_small.keras')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+'''                                 Mfcc classifier class                  '''
 
 
 class RealTimeAudioClassifier:
@@ -53,7 +56,7 @@ class RealTimeAudioClassifier:
 
     def predict(self, audio_path):
         y, sr = librosa.load(audio_path, sr=RATE, mono=True)
-        split_y = [y[i:i+CHUNK_SIZE] for i in range(0, len(y), CHUNK_SIZE)]
+        split_y = [y[i:i + CHUNK_SIZE] for i in range(0, len(y), CHUNK_SIZE)]
         if split_y[-1].shape[0] < CHUNK_SIZE:
             split_y = split_y[:-1]
         predictions = []
@@ -76,6 +79,8 @@ class RealTimeAudioClassifier:
             predictions.append(predicted.cpu().numpy()[0])
         return predictions
 
+
+'''                         Main function                             '''
 
 if __name__ == "__main__":
     prediction_path = f'{filename}.wav'
@@ -100,7 +105,7 @@ if __name__ == "__main__":
 
     frames_to_read = num_frames * CHUNK_SIZE
 
-    signal = np.frombuffer(signal[:frames_to_read*4], dtype='int16')
+    signal = np.frombuffer(signal[:frames_to_read * 4], dtype='int16')
 
     time = np.linspace(0, len(signal) / wf.getframerate(), num=len(signal))
 
@@ -207,7 +212,8 @@ if __name__ == "__main__":
                 color = 'green'
             else:
                 color = 'blue'
-            axs[2].plot(time[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE], signal[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE], color=color)
+            axs[2].plot(time[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE], signal[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE],
+                        color=color)
 
         axs[2].set_xlabel('Time [s]')
         axs[2].set_ylabel('Amplitude')
@@ -262,7 +268,8 @@ if __name__ == "__main__":
             color = 'green'
         else:
             color = 'blue'  # Silence
-        axs[3].plot(time[i * samples_per_quarter_second:(i + 1) * samples_per_quarter_second], signal[i * samples_per_quarter_second:(i + 1) * samples_per_quarter_second], color=color)
+        axs[3].plot(time[i * samples_per_quarter_second:(i + 1) * samples_per_quarter_second],
+                    signal[i * samples_per_quarter_second:(i + 1) * samples_per_quarter_second], color=color)
     axs[3].set_xlabel('Time [s]')
     axs[3].set_ylabel('Amplitude')
     axs[3].set_title('Segmenty przewidziane przez model opraty na analizie spektralnej')
