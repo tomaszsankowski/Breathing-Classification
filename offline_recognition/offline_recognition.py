@@ -35,7 +35,7 @@ CHUNK_SIZE = int(RATE * REFRESH_TIME)
 
 running = True
 
-filename = '2024-07-02_01-08-40'
+filename = '2024-07-03_12-23-20'
 CLASSIFIER_MODEL_PATH = '../pytorch_based_model/audio_rnn_classifier.pth'
 
 model_spectrogams = load_model(
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         axs[1].plot(time[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE], signal[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE], color=color)
     axs[1].set_xlabel('Time [s]')
     axs[1].set_ylabel('Amplitude')
-    axs[1].set_title('Segmenty przewidziane przez model opraty na mfcc')
+    axs[1].set_title('Segmenty przewidziane przez model oparty na mfcc')
 
     '''                        VGGish                      '''
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
         axs[2].set_xlabel('Time [s]')
         axs[2].set_ylabel('Amplitude')
-        axs[2].set_title('Segmenty przewidziane przez model opraty na modelu VGGish')
+        axs[2].set_title('Segmenty przewidziane przez model oparty na modelu VGGish')
 
     '''                     SPECTROGRAMS                    '''
 
@@ -250,7 +250,9 @@ if __name__ == "__main__":
 
         # Take only the first 224x224 part of the spectrogram
 
-        spectrogram_in = abs(stft_data[:224, :224])
+        spectrogram_in = stft_data[:224, :224]
+
+        spectrogram_in = np.abs(spectrogram_in)
 
         # Prepare input for the model ( change dimensions )
 
@@ -259,7 +261,9 @@ if __name__ == "__main__":
 
         # Model prefiction
 
-        prediction = np.argmax(model_spectrogams.predict(spectrogram_in, verbose=0))
+        predictions = model_spectrogams.predict(spectrogram_in, verbose=0)
+
+        prediction = np.argmax(predictions)
 
         color = ''
         if prediction == 0:  # Inhale
@@ -272,7 +276,7 @@ if __name__ == "__main__":
                     signal[i * samples_per_quarter_second:(i + 1) * samples_per_quarter_second], color=color)
     axs[3].set_xlabel('Time [s]')
     axs[3].set_ylabel('Amplitude')
-    axs[3].set_title('Segmenty przewidziane przez model opraty na analizie spektralnej')
+    axs[3].set_title('Segmenty przewidziane przez model oparty na analizie spektralnej')
 
     plt.tight_layout()
 

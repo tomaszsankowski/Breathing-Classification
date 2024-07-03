@@ -4,8 +4,6 @@ import pygame
 import pygame.freetype
 import time
 import pyaudio
-import numpy as np
-import matplotlib.pyplot as plt
 import threading
 import wave
 
@@ -19,7 +17,6 @@ import wave
 # self.stream = self.p.open(..., input_device_index=INDEX_OF_MICROPHONE)
 # ###########################################################################################
 AUDIO_CHUNK = 4096
-PLOT_CHUNK = 4096
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
@@ -146,24 +143,9 @@ def pygame_thread(audio):
     pygame.quit()
 
 
-def plot_audio():
-    x = np.arange(0, 2 * PLOT_CHUNK, 2)  # Przenieś tę linię do góry
-
-    fig, axs = plt.subplots(2)
-    axs[0].plot(x, np.random.rand(PLOT_CHUNK))
-    axs[1].plot(x, np.random.rand(PLOT_CHUNK))
-
-    axs[0].set_ylim(-1500, 1500)
-    axs[0].set_xlim(0, PLOT_CHUNK / 2)
-    axs[1].set_ylim(-1500, 1500)
-    axs[1].set_xlim(0, PLOT_CHUNK / 2)
-    plt.show()
-
-
 if __name__ == "__main__":
     audio = SharedAudioResource()
     pygame_thread_instance = threading.Thread(target=pygame_thread, args=(audio,))
     pygame_thread_instance.start()
-    plot_audio()
     pygame_thread_instance.join()
     audio.close()
