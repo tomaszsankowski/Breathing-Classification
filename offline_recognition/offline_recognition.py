@@ -111,6 +111,8 @@ if __name__ == "__main__":
 
     fig, axs = plt.subplots(4, 1)  # 2 rows, 1 column
 
+    tag_time[-1] = length_in_seconds
+
     '''                    HUMAN LABELED                   '''
 
     for i in range(len(tags) - 1):
